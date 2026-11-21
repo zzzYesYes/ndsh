@@ -5,6 +5,8 @@ local layout = require("ndsh.ui.layout")
 local chat = require("ndsh.ui.chat")
 local input = require("ndsh.ui.input")
 local projection = require("ndsh.projection")
+local Session = require("ndsh.session")
+local prompts = require("ndsh.ui.prompts")
 
 local M = {}
 
@@ -18,6 +20,8 @@ local state = {
   full_tab = false,
   closing = false, -- guard: our own hides must not retrigger panel teardown
   status = "idle",
+  conn = "stopped", -- session connection state: starting|ready|error|stopped
+  session = nil, ---@type table|nil NdsSession
 }
 
 local function ensure_setup()
@@ -52,6 +56,12 @@ function M.setup(opts)
       M.toggle_full()
     end, { desc = "Toggle ndsh panel (full screen)" })
   end
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = vim.api.nvim_create_augroup("ndsh_lifecycle", { clear = true }),
+    callback = function()
+      M.stop_session()
+    end,
+  })
 end
 
 ---@return boolean
@@ -163,6 +173,7 @@ function M.open(opts)
     input.set_status(state.input_win, state.status)
     watch_windows()
   end
+  M._ensure_session()
 end
 
 ---Try to show a dashboard in the surviving window after a takeover closes.
@@ -287,7 +298,60 @@ local function apply_op(op)
     chat.tool_end(buf, op.id, op.ok, op.output)
   elseif op.op == "status" then
     state.status = op.text
-    input.set_status(state.input_win, op.text)
+    -- Connection state owns the winbar outside "ready".
+    if state.conn == "ready" then
+      input.set_status(state.input_win, op.text)
+    end
+  end
+end
+
+---Connection state to winbar text outside the ready state.
+local CONN_LABEL = {
+  starting = "connecting…",
+  error = "error (:NDSHRestart)",
+  stopped = "stopped",
+}
+
+---Create and start the runtime session on first use.
+function M._ensure_session()
+  if state.session or not state.cfg.dsh.auto_connect then
+    if state.session and state.session.state == "stopped" then
+      state.session:start()
+    end
+    return
+  end
+  state.session = Session.new(state.cfg, {
+    on_event = function(event)
+      M._apply_event(event)
+    end,
+    on_status = function(status)
+      apply_op({ op = "status", text = status })
+    end,
+    on_state = function(conn)
+      state.conn = conn
+      input.set_status(state.input_win, conn == "ready" and state.status or CONN_LABEL[conn] or conn)
+    end,
+    on_notify = function(msg, level)
+      vim.notify(msg, level)
+    end,
+    on_approval = prompts.approval,
+    on_user_question = prompts.user_question,
+  })
+  state.session:start()
+end
+
+function M.stop_session()
+  if state.session then
+    state.session:stop()
+  end
+end
+
+function M.restart_session()
+  if state.session then
+    state.session:restart()
+  else
+    state.session = nil
+    M._ensure_session()
   end
 end
 
@@ -304,10 +368,15 @@ function M._apply_event(event)
   end
 end
 
----Local echo of user input until milestone 2 wires the SDK send path.
+---Send user input to the runtime. The user/message renders when its
+---session event commits, so the transcript always shows runtime truth.
 ---@param text string
 function M._on_send(text)
-  M._apply_event({ type = "user/message", content = text })
+  if not state.session then
+    vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
+    return
+  end
+  state.session:send(text)
 end
 
 ---Run the scripted demo session through the real rendering path.

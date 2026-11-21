@@ -22,7 +22,8 @@ end
 local ndsh = require("ndsh")
 
 -- 1. Takeover layout: a fresh headless nvim has one empty window.
-ndsh.setup({ restore = "scratch" })
+-- auto_connect off: the frame smoke must not spawn a real runtime.
+ndsh.setup({ restore = "scratch", dsh = { auto_connect = false } })
 ndsh.open()
 local wins = vim.api.nvim_tabpage_list_wins(0)
 check("takeover: panel is 2 windows", #wins == 2)
@@ -51,15 +52,32 @@ if input_buf then
 end
 
 -- 2. Feed events through the real projection path, synchronously.
-ndsh._apply_event({ type = "turn/start" })
-ndsh._apply_event({ type = "user/message", content = "hello ndsh" })
+ndsh._apply_event({ type = "turn/start", data = { turn = 1 } })
+ndsh._apply_event({
+  type = "user/message",
+  data = { content = { { type = "text", text = "hello ndsh" } }, source = { kind = "user" } },
+})
 ndsh._apply_event({
   type = "assistant/message",
-  content = { { type = "text", text = "hi. running a command:\n\n```sh\nls\n```" } },
+  data = {
+    turn = 1,
+    step = 1,
+    message = { content = { { type = "text", text = "hi. running a command:\n\n```sh\nls\n```" } } },
+  },
 })
-ndsh._apply_event({ type = "tool/call", callId = "c1", name = "bash", summary = "ls -la" })
-ndsh._apply_event({ type = "tool/result", callId = "c1", isError = false, output = "a\nb\nc" })
-ndsh._apply_event({ type = "turn/end" })
+ndsh._apply_event({
+  type = "tool/call",
+  data = { turn = 1, step = 1, callId = "c1", name = "bash", arguments = '{"command":"ls -la"}' },
+})
+ndsh._apply_event({
+  type = "tool/result",
+  data = {
+    turn = 1,
+    step = 1,
+    message = { toolCallId = "c1", content = { { type = "text", text = "a\nb\nc" } }, isError = false },
+  },
+})
+ndsh._apply_event({ type = "turn/end", data = { turn = 1, reason = "complete" } })
 
 local lines = vim.api.nvim_buf_get_lines(chat_buf, 0, -1, false)
 local text = table.concat(lines, "\n")
@@ -67,7 +85,7 @@ check("user header rendered", text:find("❯ You", 1, true) ~= nil)
 check("user message rendered", text:find("hello ndsh", 1, true) ~= nil)
 check("assistant header rendered", text:find("● ndsh", 1, true) ~= nil)
 check("assistant markdown rendered", text:find("```sh", 1, true) ~= nil)
-check("tool line completed with ✓", text:find("✓ bash · ls %-la") ~= nil)
+check("tool line completed with ✓", text:find('✓ bash · %{"command":"ls %-la"%}') ~= nil)
 check("tool output rendered", text:find("  │ a", 1, true) ~= nil)
 
 -- 3. The tool result must be folded closed in the chat window.
@@ -97,6 +115,7 @@ ndsh.setup({
   restore = function(win)
     vim.api.nvim_buf_set_name(vim.api.nvim_win_get_buf(win), "restored-marker")
   end,
+  dsh = { auto_connect = false },
 })
 ndsh.open()
 ndsh.close()
@@ -107,7 +126,7 @@ check(
   vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(wins[1])):find("restored%-marker$") ~= nil
 )
 vim.cmd("bwipeout!")
-ndsh.setup({ restore = "scratch" })
+ndsh.setup({ restore = "scratch", dsh = { auto_connect = false } })
 
 -- 5. With a code buffer up, the panel docks right (3 windows) instead.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
@@ -200,7 +219,7 @@ ndsh.close()
 -- 11. restore = "quit" (the default) exits Neovim when the closing panel
 -- is the only pane left. Runs last: a successful close ends the process.
 vim.cmd("enew")
-ndsh.setup({ restore = "quit" })
+ndsh.setup({ restore = "quit", dsh = { auto_connect = false } })
 ndsh.open()
 check("quit mode: panel takes over", ndsh.is_open())
 

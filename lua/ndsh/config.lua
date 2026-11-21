@@ -32,6 +32,23 @@ M.defaults = {
   --- "dashboard" (try config.dashboard, :Dashboard, :Alpha, snacks.dashboard),
   --- "scratch" (empty buffer), or fun(win: integer) for a custom restore.
   restore = "quit",
+  --- dsh runtime connection.
+  dsh = {
+    --- Explicit runtime argv; nil resolves an installed `dsh`, then the
+    --- ~/workspace/deepseek-harness source checkout via pnpm.
+    cmd = nil, ---@type string[]|nil
+    profile = "sdk",
+    --- Connect when the panel opens; false connects only on :NDSHRestart.
+    auto_connect = true,
+    provider = "deepseek-official",
+    model = "deepseek-v4-flash",
+    reasoning_effort = nil, ---@type string|nil
+    max_tokens = nil, ---@type integer|nil
+    --- Receive approval/request server prompts for every tool grant.
+    approval = true,
+    --- Receive user-question/ask server prompts.
+    user_questions = true,
+  },
 }
 
 local function is_list(v)

@@ -38,44 +38,87 @@ local READ_OUTPUT = table.concat({
   "  7  return M",
 }, "\n")
 
----Scripted event timeline. Each entry is { delay_ms, event }.
+---Scripted event timeline in the real SessionEvent envelope shape.
+---Each entry is { delay_ms, event }.
 local script = {
-  { 100, { type = "turn/start" } },
+  { 100, { type = "turn/start", data = { turn = 1 } } },
   {
     300,
-    { type = "user/message", content = "what's in my workspace? also show me a lua snippet." },
+    {
+      type = "user/message",
+      data = {
+        content = { { type = "text", text = "what's in my workspace? also show me a lua snippet." } },
+        source = { kind = "user" },
+      },
+    },
   },
   {
     700,
     {
       type = "assistant/message",
-      content = { { type = "text", text = ASSISTANT_INTRO } },
+      data = {
+        turn = 1,
+        step = 1,
+        message = { content = { { type = "text", text = ASSISTANT_INTRO } } },
+      },
     },
   },
   {
     500,
-    { type = "tool/call", callId = "call_1", name = "bash", summary = "ls -la ~/workspace" },
+    {
+      type = "tool/call",
+      data = { turn = 1, step = 1, callId = "call_1", name = "bash", arguments = '{"command":"ls -la ~/workspace"}' },
+    },
   },
   {
     1200,
-    { type = "tool/result", callId = "call_1", isError = false, output = LS_OUTPUT },
+    {
+      type = "tool/result",
+      data = {
+        turn = 1,
+        step = 1,
+        message = {
+          toolCallId = "call_1",
+          content = { { type = "text", text = LS_OUTPUT } },
+          isError = false,
+        },
+      },
+    },
   },
   {
     600,
-    { type = "tool/call", callId = "call_2", name = "read_file", summary = "ndsh/lua/hello.lua" },
+    {
+      type = "tool/call",
+      data = { turn = 1, step = 2, callId = "call_2", name = "read_file", arguments = '{"path":"ndsh/lua/hello.lua"}' },
+    },
   },
   {
     900,
-    { type = "tool/result", callId = "call_2", isError = false, output = READ_OUTPUT },
+    {
+      type = "tool/result",
+      data = {
+        turn = 1,
+        step = 2,
+        message = {
+          toolCallId = "call_2",
+          content = { { type = "text", text = READ_OUTPUT } },
+          isError = false,
+        },
+      },
+    },
   },
   {
     800,
     {
       type = "assistant/message",
-      content = { { type = "text", text = ASSISTANT_OUTRO } },
+      data = {
+        turn = 1,
+        step = 3,
+        message = { content = { { type = "text", text = ASSISTANT_OUTRO } } },
+      },
     },
   },
-  { 200, { type = "turn/end" } },
+  { 200, { type = "turn/end", data = { turn = 1, reason = "complete" } } },
 }
 
 ---Play the demo timeline against the live panel.
