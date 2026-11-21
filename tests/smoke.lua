@@ -124,6 +124,23 @@ check(
   #vim.api.nvim_list_tabpages() == tabs_before and #vim.api.nvim_tabpage_list_wins(0) == 1
 )
 
+-- 8. Closing one panel window by hand tears the whole panel down.
+vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
+ndsh.open()
+local chat_win = vim.fn.bufwinid(chat_buf)
+local input_win_id = vim.fn.bufwinid(input_buf)
+vim.api.nvim_win_close(chat_win, true)
+vim.wait(100, function()
+  return not vim.api.nvim_win_is_valid(input_win_id)
+end)
+check("manual :q on chat closes input too", not vim.api.nvim_win_is_valid(input_win_id))
+check("panel reports closed", not ndsh.is_open())
+local wins_after = #vim.api.nvim_tabpage_list_wins(0)
+ndsh.open()
+check("reopen after manual close: clean 3 windows", #vim.api.nvim_tabpage_list_wins(0) == 3)
+ndsh.close()
+check("final close: back to code window", #vim.api.nvim_tabpage_list_wins(0) == wins_after)
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

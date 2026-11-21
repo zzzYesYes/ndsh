@@ -16,6 +16,7 @@ local state = {
   input_win = nil, ---@type integer|nil
   takeover = false,
   full_tab = false,
+  closing = false, -- guard: our own hides must not retrigger panel teardown
   status = "idle",
 }
 
@@ -52,6 +53,36 @@ function M.is_open()
   return state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
 end
 
+---Hide panel windows without retriggering the WinClosed teardown.
+---@param wins table
+local function hide_guarded(wins)
+  state.closing = true
+  layout.hide(wins)
+  -- WinClosed handlers are scheduled, so the guard lifts after they run.
+  vim.schedule(function()
+    state.closing = false
+  end)
+end
+
+---The panel is one unit: when the user closes either window by hand (:q,
+---<C-w>c, ...), tear the whole panel down. Buffers are kept.
+local function watch_windows()
+  local group = vim.api.nvim_create_augroup("ndsh_panel", { clear = true })
+  for _, win in ipairs({ state.chat_win, state.input_win }) do
+    vim.api.nvim_create_autocmd("WinClosed", {
+      group = group,
+      pattern = tostring(win),
+      callback = function()
+        vim.schedule(function()
+          if not state.closing then
+            M.close()
+          end
+        end)
+      end,
+    })
+  end
+end
+
 ---@param opts { full: boolean|nil }|nil full: open as a full tab even with
 ---code buffers open (implemented as a new tabpage; closing restores it).
 function M.open(opts)
@@ -63,7 +94,7 @@ function M.open(opts)
       M.close()
     elseif vim.api.nvim_win_get_tabpage(state.chat_win) ~= vim.api.nvim_get_current_tabpage() then
       -- Open in another tab: move the panel here instead of duplicating it.
-      layout.hide({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
+      hide_guarded({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
     else
       return
     end
@@ -81,25 +112,36 @@ function M.open(opts)
   state.takeover = wins.takeover
   state.full_tab = full_tab and wins.takeover
   input.set_status(state.input_win, state.status)
+  watch_windows()
 end
 
 function M.close()
-  if not M.is_open() and not (state.input_win and vim.api.nvim_win_is_valid(state.input_win)) then
+  local chat_valid = state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
+  local input_valid = state.input_win ~= nil and vim.api.nvim_win_is_valid(state.input_win)
+  if not chat_valid and not input_valid then
+    state.chat_win, state.input_win = nil, nil
+    state.takeover, state.full_tab = false, false
     return
   end
+  state.closing = true
   if state.full_tab then
-    -- The chat window is the tab's last window; close the whole tabpage.
-    if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
-      vim.api.nvim_win_hide(state.input_win)
-    end
+    -- Closing the tabpage closes both panel windows with it.
     pcall(vim.cmd, "tabclose")
   else
-    layout.hide({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
+    layout.hide({
+      chat = chat_valid and state.chat_win or nil,
+      input = input_valid and state.input_win or nil,
+      takeover = state.takeover,
+    })
   end
   state.chat_win = nil
   state.input_win = nil
   state.takeover = false
   state.full_tab = false
+  -- WinClosed handlers are scheduled, so the guard lifts after they run.
+  vim.schedule(function()
+    state.closing = false
+  end)
 end
 
 function M.toggle()
