@@ -29,11 +29,14 @@ set runtimepath+=~/workspace/ndsh
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ao`) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
+| `:NDSHOpen!` | Open as a full-screen tab regardless of what's open |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 
-Layout adapts: with a single empty window the panel takes the whole tab (like
-a full-screen TUI session); with code buffers open it docks right by default
-(`layout = "right" | "bottom" | "float"`).
+Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
+panel takes the whole tab like a full-screen TUI session; with code buffers
+open it docks right by default (`layout = "right" | "bottom" | "float"`).
+`:NDSHOpen!` forces full-screen by opening a dedicated tab, leaving your
+splits untouched; closing it tabs back out.
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
 native. Chat buffer locals: `q` closes, `i` jumps to input, `<Tab>` toggles

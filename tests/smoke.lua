@@ -101,6 +101,29 @@ ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)
 check("docked close: only code window remains", #wins == 1)
 
+-- 6. A dashboard-style nofile buffer also counts as "no code buffer up".
+vim.cmd("enew")
+local dash = vim.api.nvim_get_current_buf()
+vim.api.nvim_set_option_value("buftype", "nofile", { buf = dash })
+vim.api.nvim_buf_set_name(dash, "dashboard")
+ndsh.open()
+wins = vim.api.nvim_tabpage_list_wins(0)
+check("dashboard: panel takes over (2 windows)", #wins == 2)
+ndsh.close()
+
+-- 7. Explicit full mode over a code buffer opens a dedicated tab.
+vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
+local tabs_before = #vim.api.nvim_list_tabpages()
+ndsh.open({ full = true })
+wins = vim.api.nvim_tabpage_list_wins(0)
+check("full: panel is a full tab (2 windows)", #wins == 2)
+check("full: opened a new tabpage", #vim.api.nvim_list_tabpages() == tabs_before + 1)
+ndsh.close()
+check(
+  "full close: tabpage restored",
+  #vim.api.nvim_list_tabpages() == tabs_before and #vim.api.nvim_tabpage_list_wins(0) == 1
+)
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

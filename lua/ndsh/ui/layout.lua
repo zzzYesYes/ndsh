@@ -5,8 +5,10 @@
 --- hidden on toggle-off and re-shown on toggle-on; buffers persist either way.
 local M = {}
 
----One empty window means "no code buffer is up": take over the whole tab,
----like a full-screen TUI session.
+---"No code buffer is up" when the tab holds one unmodified window whose
+---buffer is not a real file: unnamed scratch, dashboards and other nofile
+---buffers all count, and the panel takes over the whole tab like a
+---full-screen TUI session.
 ---@return boolean
 local function should_takeover()
   local wins = vim.api.nvim_tabpage_list_wins(0)
@@ -14,9 +16,19 @@ local function should_takeover()
     return false
   end
   local buf = vim.api.nvim_win_get_buf(wins[1])
-  return vim.api.nvim_buf_get_name(buf) == ""
-    and vim.api.nvim_get_option_value("buftype", { buf = buf }) == ""
-    and not vim.api.nvim_get_option_value("modified", { buf = buf })
+  if vim.api.nvim_get_option_value("modified", { buf = buf }) then
+    return false
+  end
+  local is_real_file = vim.api.nvim_get_option_value("buftype", { buf = buf }) == ""
+    and vim.api.nvim_buf_get_name(buf) ~= ""
+  return not is_real_file
+end
+
+---Whether the current tab satisfies the takeover rule. Used by init.open()
+---to decide if full mode needs a fresh tabpage.
+---@return boolean
+function M.is_takeover_tab()
+  return should_takeover()
 end
 
 local function set_chat_win_options(win)

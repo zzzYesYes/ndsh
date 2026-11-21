@@ -15,6 +15,7 @@ local state = {
   chat_win = nil, ---@type integer|nil
   input_win = nil, ---@type integer|nil
   takeover = false,
+  full_tab = false,
   status = "idle",
 }
 
@@ -51,21 +52,34 @@ function M.is_open()
   return state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
 end
 
-function M.open()
+---@param opts { full: boolean|nil }|nil full: open as a full tab even with
+---code buffers open (implemented as a new tabpage; closing restores it).
+function M.open(opts)
+  opts = opts or {}
   ensure_setup()
   ensure_buffers()
   if M.is_open() then
-    -- Open in another tab: move the panel here instead of duplicating it.
-    if vim.api.nvim_win_get_tabpage(state.chat_win) ~= vim.api.nvim_get_current_tabpage() then
+    if opts.full then
+      M.close()
+    elseif vim.api.nvim_win_get_tabpage(state.chat_win) ~= vim.api.nvim_get_current_tabpage() then
+      -- Open in another tab: move the panel here instead of duplicating it.
       layout.hide({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
     else
       return
     end
   end
+  local full_tab = false
+  if opts.full and not layout.is_takeover_tab() then
+    -- Full-screen over existing content would destroy windows; a fresh tab
+    -- gives the same area non-destructively and tabs back out on close.
+    vim.cmd("tabnew")
+    full_tab = true
+  end
   local wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
   state.chat_win = wins.chat
   state.input_win = wins.input
   state.takeover = wins.takeover
+  state.full_tab = full_tab and wins.takeover
   input.set_status(state.input_win, state.status)
 end
 
@@ -73,10 +87,19 @@ function M.close()
   if not M.is_open() and not (state.input_win and vim.api.nvim_win_is_valid(state.input_win)) then
     return
   end
-  layout.hide({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
+  if state.full_tab then
+    -- The chat window is the tab's last window; close the whole tabpage.
+    if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
+      vim.api.nvim_win_hide(state.input_win)
+    end
+    pcall(vim.cmd, "tabclose")
+  else
+    layout.hide({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
+  end
   state.chat_win = nil
   state.input_win = nil
   state.takeover = false
+  state.full_tab = false
 end
 
 function M.toggle()
