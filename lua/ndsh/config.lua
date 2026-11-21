@@ -11,7 +11,7 @@ M.defaults = {
   --- Panel height as a fraction of &lines (bottom layout).
   height = 0.3,
   --- Input window height in rows.
-  input_height = 6,
+  input_height = 8,
   keys = {
     --- Send from the input buffer (insert and normal mode). Normal-mode
     --- <CR> also sends; insert-mode <CR> is always a plain newline.
