@@ -4,6 +4,7 @@
 local config = require("ndsh.config")
 local Runtime = require("ndsh.runtime")
 local Conversation = require("ndsh.conversation")
+local commands = require("ndsh.commands")
 local prompts = require("ndsh.ui.prompts")
 local sessions_ui = require("ndsh.ui.sessions")
 
@@ -233,31 +234,6 @@ function M.rename(name)
   end)
 end
 
----Local slash commands: handled here, never sent to the wire. Unknown
----slash commands pass through to the runtime's native command routing.
-local slash = {}
-
----@param args string
-slash["rename"] = function(conv, args)
-  if args == "" then
-    vim.notify("ndsh: /rename needs a name", vim.log.levels.WARN)
-    return
-  end
-  conv:rename(args)
-  vim.notify(("ndsh: session renamed to %s"):format(args), vim.log.levels.INFO)
-end
-
----Try to handle text as a local slash command.
----@return boolean handled
-local function run_slash(conv, text)
-  local cmd, args = text:match("^/(%S+)%s*(.-)%s*$")
-  if cmd and slash[cmd] then
-    slash[cmd](conv, args)
-    return true
-  end
-  return false
-end
-
 ---Echo input locally, then send it on the conversation's wire session.
 ---Accepts (conv, text); a single argument is treated as text on the active
 ---conversation (test and dev harness path).
@@ -268,7 +244,7 @@ function M._on_send(conv, text)
     text = conv --[[@as string]]
     conv = active_conversation()
   end
-  if run_slash(conv, text) then
+  if commands.run(conv, text) then
     return
   end
   conv:echo_user(text)

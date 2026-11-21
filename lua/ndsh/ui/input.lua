@@ -61,4 +61,26 @@ function M.set_status(win, text)
   end
 end
 
+---Highlight local slash commands live while typing, opencode-style.
+---Window-local matches re-evaluate on every buffer change, so /rename
+---lights up as soon as it becomes a valid command.
+---@param win integer input window
+---@param names string[] registered local command names
+function M.highlight_commands(win, names)
+  if not (win and vim.api.nvim_win_is_valid(win)) or #names == 0 then
+    return
+  end
+  vim.api.nvim_set_hl(0, "NDSHSlashCommand", { link = "Special", default = true })
+  local pattern = [[^/\%(]] .. table.concat(names, [[\|]]) .. [[\)\>]]
+  vim.api.nvim_win_call(win, function()
+    -- Replace, not stack, on re-application.
+    for _, match in ipairs(vim.fn.getmatches(win)) do
+      if match.group == "NDSHSlashCommand" then
+        vim.fn.matchdelete(match.id, win)
+      end
+    end
+    vim.fn.matchadd("NDSHSlashCommand", pattern, 10, -1, { window = win })
+  end)
+end
+
 return M

@@ -184,6 +184,21 @@ do
   vim.fn.delete(vim.fn.fnamemodify(path, ":h"), "rf")
 end
 
+-- Local slash command registry.
+do
+  local commands = require("ndsh.commands")
+  check("commands.names includes rename", vim.tbl_contains(commands.names(), "rename"))
+  local renamed
+  local conv = {
+    rename = function(_, name)
+      renamed = name
+    end,
+  }
+  check("run handles /rename", commands.run(conv, "/rename work") and renamed == "work")
+  check("run passes unknown commands through", not commands.run(conv, "/compact please"))
+  check("run passes ordinary text through", not commands.run(conv, "hello /rename"))
+end
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

@@ -158,6 +158,25 @@ check(
 )
 check("/rename never hits the wire", chat2_text():find("FAKE%-OUTRO: /rename") == nil)
 
+-- Slash commands are highlighted live in the input pane.
+local input2_buf
+for _, b in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.api.nvim_get_option_value("filetype", { buf = b }) == "ndshinput"
+    and vim.api.nvim_buf_get_name(b):find(conv2.id, 1, true)
+  then
+    input2_buf = b
+  end
+end
+vim.api.nvim_buf_set_lines(input2_buf, 0, -1, false, { "/rename work" })
+local input2_win = vim.fn.bufwinid(input2_buf)
+local has_match = false
+for _, m in ipairs(vim.fn.getmatches(input2_win)) do
+  if m.group == "NDSHSlashCommand" then
+    has_match = true
+  end
+end
+check("input pane highlights local slash commands", has_match)
+
 -- 6. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()
 local stopped = vim.wait(5000, function()
