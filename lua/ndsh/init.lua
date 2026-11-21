@@ -138,9 +138,15 @@ local function guard_panel_buffers()
   end
   for _, buf in ipairs(relocated) do
     if vim.api.nvim_buf_is_valid(buf) then
-      vim.cmd("tabnew")
-      vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
-      vim.notify("ndsh: opened in a new tab (panel windows are reserved)", vim.log.levels.INFO)
+      -- Third-party autocmds fire when the buffer enters the new tab's
+      -- window; their errors must not abort the relocation loop.
+      local ok = pcall(function()
+        vim.cmd("tabnew")
+        vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
+      end)
+      if ok then
+        vim.notify("ndsh: opened in a new tab (panel windows are reserved)", vim.log.levels.INFO)
+      end
     end
   end
 end
