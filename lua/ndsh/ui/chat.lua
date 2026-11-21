@@ -93,6 +93,8 @@ function M.create(keys)
   -- Own filetype so statusline plugins can be disabled for panel windows;
   -- markdown treesitter highlighting is attached explicitly (soft dep).
   vim.api.nvim_set_option_value("filetype", "ndsh", { buf = buf })
+  -- Named, so :edit in the pane cannot reuse this buffer for a file.
+  vim.api.nvim_buf_set_name(buf, "ndsh://chat")
   pcall(vim.treesitter.start, buf, "markdown")
   states[buf] = { empty = true, msg_open = false, tools = {} }
 

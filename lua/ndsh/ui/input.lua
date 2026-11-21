@@ -28,6 +28,8 @@ function M.create(cfg, on_send)
   vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
   -- Own filetype so statusline plugins can be disabled for panel windows.
   vim.api.nvim_set_option_value("filetype", "ndshinput", { buf = buf })
+  -- Named, so :edit in the pane cannot reuse this buffer for a file.
+  vim.api.nvim_buf_set_name(buf, "ndsh://input")
 
   local function send()
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
