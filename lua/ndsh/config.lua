@@ -25,10 +25,11 @@ M.defaults = {
     tabnext = nil, ---@type string|nil
     tabprev = nil, ---@type string|nil
   },
-  --- What fills the surviving window when a full-tab takeover closes:
+  --- What happens when a full-tab takeover panel closes while it is the
+  --- only pane left: "quit" (exit Neovim, like :q on the last file window),
   --- "dashboard" (try config.dashboard, :Dashboard, :Alpha, snacks.dashboard),
   --- "scratch" (empty buffer), or fun(win: integer) for a custom restore.
-  restore = "dashboard",
+  restore = "quit",
 }
 
 local function is_list(v)
@@ -50,10 +51,11 @@ function M.resolve(opts)
   assert(type(cfg.input_height) == "number" and cfg.input_height >= 1, "ndsh: input_height must be >= 1")
   assert(is_list(cfg.keys.send), "ndsh: keys.send must be a list of key strings")
   assert(
-    cfg.restore == "dashboard"
+    cfg.restore == "quit"
+      or cfg.restore == "dashboard"
       or cfg.restore == "scratch"
       or type(cfg.restore) == "function",
-    "ndsh: restore must be 'dashboard', 'scratch' or a function"
+    "ndsh: restore must be 'quit', 'dashboard', 'scratch' or a function"
   )
   return cfg
 end

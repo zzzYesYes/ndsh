@@ -187,6 +187,15 @@ function M.close()
     state.takeover, state.full_tab = false, false
     return
   end
+  -- Only the panel is left in the only tab: closing it exits Neovim like
+  -- :q on the last file window. Falls through to hide on :quitall failure
+  -- (e.g. a modified hidden buffer) and restores a scratch instead.
+  local only_pane = state.takeover and #vim.api.nvim_list_tabpages() == 1
+  if only_pane and state.cfg.restore == "quit" then
+    if pcall(vim.cmd, "quitall") then
+      return
+    end
+  end
   state.closing = true
   local survivor = nil
   if state.full_tab then

@@ -22,7 +22,7 @@ end
 local ndsh = require("ndsh")
 
 -- 1. Takeover layout: a fresh headless nvim has one empty window.
-ndsh.setup({})
+ndsh.setup({ restore = "scratch" })
 ndsh.open()
 local wins = vim.api.nvim_tabpage_list_wins(0)
 check("takeover: panel is 2 windows", #wins == 2)
@@ -82,8 +82,7 @@ local fold_ok = vim.api.nvim_win_call(chat_win, function()
 end)
 check("tool result folded closed", fold_ok)
 
--- 4. Close in takeover mode restores a single empty window (no dashboard
--- provider exists under -u NONE, so the scratch fallback shows).
+-- 4. Close in takeover mode with restore="scratch" leaves an empty window.
 ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)
 check("takeover close: back to 1 window", #wins == 1)
@@ -108,7 +107,7 @@ check(
   vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(wins[1])):find("restored%-marker$") ~= nil
 )
 vim.cmd("bwipeout!")
-ndsh.setup({})
+ndsh.setup({ restore = "scratch" })
 
 -- 5. With a code buffer up, the panel docks right (3 windows) instead.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
@@ -180,9 +179,18 @@ ndsh.open()
 check("reopen rebuilds panel buffers", ndsh.is_open() and #vim.api.nvim_tabpage_list_wins(0) == 3)
 ndsh.close()
 
+-- 11. restore = "quit" (the default) exits Neovim when the closing panel
+-- is the only pane left. Runs last: a successful close ends the process.
+vim.cmd("enew")
+ndsh.setup({ restore = "quit" })
+ndsh.open()
+check("quit mode: panel takes over", ndsh.is_open())
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")
 end
 print("all checks passed")
-vim.cmd("quitall!")
+ndsh.close() -- should exit Neovim here
+print("FAIL - quit mode did not exit Neovim")
+vim.cmd("cquit 1")

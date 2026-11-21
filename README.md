@@ -36,7 +36,10 @@ Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
 panel takes the whole tab like a full-screen TUI session; with code buffers
 open it docks right by default (`layout = "right" | "bottom" | "float"`).
 `:NDSHOpen!` forces full-screen by opening a dedicated tab, leaving your
-splits untouched; closing it tabs back out.
+splits untouched; closing it tabs back out. When the takeover panel is the
+only pane left, closing it exits Neovim like `:q` on the last file window
+(`restore = "quit"`, the default); alternatives are `"dashboard"` (show your
+dashboard plugin), `"scratch"` (empty buffer), or a `fun(win)` hook.
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
 native. Chat buffer locals: `q` closes, `i` jumps to input, `<Tab>` toggles
