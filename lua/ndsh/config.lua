@@ -42,6 +42,9 @@ M.defaults = {
     auto_connect = true,
     provider = "deepseek-official",
     model = "deepseek-v4-flash",
+    --- Extra routes offered by :NDSHModel, e.g.
+    --- { provider = "anthropic", model = "claude-sonnet-4-5", label = "Claude Sonnet" }.
+    models = {}, ---@type table[]
     reasoning_effort = nil, ---@type string|nil
     max_tokens = nil, ---@type integer|nil
     --- Receive approval/request server prompts for every tool grant.

@@ -58,4 +58,30 @@ function M.env_for(provider, path)
   return entry and entry.env or {}
 end
 
+---The last explicitly selected route, or nil. Stored under a reserved key
+---separate from credential entries.
+---@param path string|nil
+---@return { provider: string, model: string }|nil
+function M.current(path)
+  local current = M.load(path)._current
+  if type(current) == "table" and current.provider and current.model then
+    return { provider = current.provider, model = current.model }
+  end
+  return nil
+end
+
+---Persist the selected route and keep the provider's model in sync.
+---@param provider string
+---@param model string
+---@param path string|nil
+function M.set_current(provider, model, path)
+  local store = M.load(path)
+  store._current = { provider = provider, model = model }
+  local entry = store[provider]
+  if type(entry) == "table" then
+    entry.model = model
+  end
+  M.save(store, path)
+end
+
 return M

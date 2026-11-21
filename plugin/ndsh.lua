@@ -34,3 +34,7 @@ end, { desc = "Show the ndsh runtime log" })
 vim.api.nvim_create_user_command("NDSHConnect", function()
   require("ndsh").connect()
 end, { desc = "Connect a model provider" })
+
+vim.api.nvim_create_user_command("NDSHModel", function()
+  require("ndsh").select_model()
+end, { desc = "Select the active model" })

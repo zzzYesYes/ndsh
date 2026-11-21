@@ -143,6 +143,21 @@ do
   )
   local perms = vim.fn.getfperm(path)
   check("credentials file is owner-only", perms == "rw-------")
+
+  credentials.set_current("anthropic", "claude-sonnet-4-5", path)
+  local current = credentials.current(path)
+  check(
+    "current route roundtrip",
+    current ~= nil and current.provider == "anthropic" and current.model == "claude-sonnet-4-5"
+  )
+  check(
+    "set_current syncs provider model",
+    credentials.get("anthropic", path).model == "claude-sonnet-4-5"
+  )
+  check(
+    "current ignores credential entries",
+    credentials.current(path).provider ~= "deepseek-official"
+  )
   vim.fn.delete(vim.fn.fnamemodify(path, ":h"), "rf")
 end
 
