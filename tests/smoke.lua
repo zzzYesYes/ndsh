@@ -46,8 +46,8 @@ if input_buf then
     vim.api.nvim_win_get_height(vim.fn.bufwinid(input_buf)) == 8
   )
   check(
-    "input window has a statusline",
-    vim.api.nvim_get_option_value("statusline", { win = vim.fn.bufwinid(input_buf) }):find("ndsh") ~= nil
+    "input window has status winbar",
+    vim.api.nvim_get_option_value("winbar", { win = vim.fn.bufwinid(input_buf) }):find("ndsh") ~= nil
   )
 end
 

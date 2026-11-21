@@ -46,12 +46,12 @@ function M.create(cfg, on_send)
   return buf
 end
 
----Update the input window's statusline.
+---Update the input window's status winbar.
 ---@param win integer
 ---@param text string e.g. "idle · 12k/128k · 10%%"
 function M.set_status(win, text)
   if win and vim.api.nvim_win_is_valid(win) then
-    vim.api.nvim_set_option_value("statusline", " ndsh · " .. text, { win = win })
+    vim.api.nvim_set_option_value("winbar", " ndsh · " .. text, { win = win })
   end
 end
 

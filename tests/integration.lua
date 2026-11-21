@@ -31,13 +31,13 @@ local function find_chat_buf()
   return nil
 end
 
-local function statusline_text(win)
-  return vim.api.nvim_get_option_value("statusline", { win = win })
+local function winbar_text(win)
+  return vim.api.nvim_get_option_value("winbar", { win = win })
 end
 
 ---The winbar carries a context-usage suffix after the status word.
 local function has_status(win, status)
-  return statusline_text(win):find("^ ndsh · " .. status) ~= nil
+  return winbar_text(win):find("^ ndsh · " .. status) ~= nil
 end
 
 local ndsh = require("ndsh")
@@ -80,14 +80,14 @@ check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo h
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
 -- Chrome: chat winbar shows model and cwd, input winbar shows context usage.
-local chat_statusline = statusline_text(vim.fn.bufwinid(chat_buf))
+local chat_winbar = winbar_text(vim.fn.bufwinid(chat_buf))
 check(
   "chat winbar shows model and cwd",
-  chat_statusline:find("fake%-v1") ~= nil and chat_statusline:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
+  chat_winbar:find("fake%-v1") ~= nil and chat_winbar:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
 )
 check(
   "input winbar shows context usage",
-  statusline_text(input_win):find("12k/128k · 10%%%%") ~= nil
+  winbar_text(input_win):find("12k/128k · 10%%%%") ~= nil
 )
 
 local back_idle = vim.wait(5000, function()

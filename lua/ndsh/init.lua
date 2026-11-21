@@ -325,15 +325,17 @@ local CONN_LABEL = {
   stopped = "stopped",
 }
 
----Refresh both panel statuslines from current state:
+---Refresh both panel winbars from current state:
 --- chat  — active model and session working directory
 --- input — connection/agent status and context usage
+--- Winbar, not statusline: statusline plugins (lualine & co.) own and
+--- overwrite 'statusline' per window; winbar is untouched by them.
 refresh_chrome = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     local model = state.route and state.route.model or state.cfg.dsh.model
     local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
     vim.api.nvim_set_option_value(
-      "statusline",
+      "winbar",
       (" %s%s%s"):format(model, cwd ~= "" and " · " or "", cwd),
       { win = state.chat_win }
     )
@@ -344,7 +346,7 @@ refresh_chrome = function()
     if state.context.used then
       ctx = " · " .. fmt_tokens(state.context.used)
       if state.context.window then
-        -- statusline syntax: a literal % must be doubled.
+        -- winbar is statusline syntax: a literal % must be doubled.
         ctx = ctx .. ("/%s · %d%%%%"):format(
           fmt_tokens(state.context.window),
           math.floor(state.context.used / state.context.window * 100 + 0.5)
