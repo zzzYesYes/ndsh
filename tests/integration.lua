@@ -79,9 +79,13 @@ check("user message rendered", chat_text():find("❯ You", 1, true) ~= nil)
 check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo hi\"%}") ~= nil)
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
--- Chrome: everything on the chat (input) pane winbar — model left, cwd
--- and context usage right; the message pane carries no winbar.
-check("message pane has no winbar", winbar_text(vim.fn.bufwinid(chat_buf)) == "")
+-- Chrome: everything except the session name lives on the chat (input)
+-- pane winbar — model left, cwd and context usage right. The message pane
+-- winbar carries the session name.
+check(
+  "message pane winbar shows session name",
+  winbar_text(vim.fn.bufwinid(chat_buf)):find("chat 1", 1, true) ~= nil
+)
 local input_winbar = winbar_text(input_win)
 check(
   "chat winbar shows model and cwd",
@@ -117,7 +121,44 @@ local second = vim.wait(10000, function()
 end, 100)
 check("prompt after restart renders", second)
 
--- 4. Graceful stop: no error state, winbar shows stopped.
+-- 4. Multi-session: a second conversation gets its own tab, transcript and
+-- status; the first conversation is untouched.
+local conv2 = ndsh.new_session()
+check("new session opens a second tab", #vim.api.nvim_list_tabpages() == 2)
+local chat2_buf
+for _, b in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.api.nvim_get_option_value("filetype", { buf = b }) == "ndsh" and b ~= chat_buf then
+    chat2_buf = b
+  end
+end
+check("second conversation has its own chat buffer", chat2_buf ~= nil)
+local function chat2_text()
+  return table.concat(vim.api.nvim_buf_get_lines(chat2_buf, 0, -1, false), "\n")
+end
+ndsh._on_send(conv2, "second conversation here")
+local second_conv = vim.wait(10000, function()
+  return chat2_text():find("FAKE%-OUTRO: second conversation here") ~= nil
+end, 100)
+check("second conversation transcript renders", second_conv)
+check(
+  "transcripts are isolated",
+  chat2_text():find("integration hello", 1, true) == nil
+    and chat_text():find("second conversation here", 1, true) == nil
+)
+check(
+  "second tab winbar shows its session name",
+  winbar_text(vim.fn.bufwinid(chat2_buf)):find("chat 2", 1, true) ~= nil
+)
+
+-- 5. /rename is local: renames the conversation, hits no wire.
+ndsh._on_send(conv2, "/rename second")
+check(
+  "/rename updates the winbar name",
+  winbar_text(vim.fn.bufwinid(chat2_buf)):find("second", 1, true) ~= nil
+)
+check("/rename never hits the wire", chat2_text():find("FAKE%-OUTRO: /rename") == nil)
+
+-- 6. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()
 local stopped = vim.wait(5000, function()
   return has_status(input_win, "stopped")

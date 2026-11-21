@@ -17,9 +17,12 @@ M.defaults = {
     --- <CR> also sends; insert-mode <CR> is always a plain newline.
     send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
-    toggle = "<leader>ao",
+    toggle = "<leader>anr",
     --- Global full-screen panel toggle; nil to define your own.
-    toggle_full = "<leader>aO",
+    toggle_full = "<leader>anf",
+    --- Session navigator and new-session mappings; nil to define your own.
+    sessions = "<leader>ans",
+    new_session = "<leader>ann",
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
     --- are meaningless inside the reserved panel windows, so bind them to

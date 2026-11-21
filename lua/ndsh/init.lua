@@ -1,36 +1,24 @@
---- ndsh plugin entry: setup, panel state, and the event-application path
---- shared by the dev harness and (milestone 2) the live SDK protocol.
+--- ndsh plugin entry: setup, the conversation registry, runtime wiring,
+--- commands, and local slash commands. Per-conversation window/buffer
+--- behavior lives in ndsh.conversation; process/transport in ndsh.runtime.
 local config = require("ndsh.config")
-local layout = require("ndsh.ui.layout")
-local chat = require("ndsh.ui.chat")
-local input = require("ndsh.ui.input")
-local projection = require("ndsh.projection")
-local Session = require("ndsh.session")
+local Runtime = require("ndsh.runtime")
+local Conversation = require("ndsh.conversation")
 local prompts = require("ndsh.ui.prompts")
+local sessions_ui = require("ndsh.ui.sessions")
 
 local M = {}
 
--- Forward declaration: open() refreshes chrome before its definition site.
-local refresh_chrome
-
 local state = {
   cfg = nil, ---@type table|nil
-  chat_buf = nil, ---@type integer|nil
-  input_buf = nil, ---@type integer|nil
-  chat_win = nil, ---@type integer|nil
-  input_win = nil, ---@type integer|nil
-  takeover = false,
-  full_tab = false,
-  closing = false, -- guard: our own hides must not retrigger panel teardown
-  status = "idle",
-  conn = "stopped", -- session connection state: starting|ready|error|stopped
-  session = nil, ---@type table|nil NdsSession
-  route = nil, ---@type { provider: string, model: string }|nil
-  context = { used = nil, window = nil }, ---@type { used: integer|nil, window: integer|nil }
-  cwd = nil, ---@type string|nil session working directory
-  -- What a takeover replaced, for restoration on close.
-  prev_buf = nil, ---@type integer|nil
-  prev_contentful = false,
+  runtime = nil, ---@type table|nil NdsRuntime
+  conn = "stopped", -- runtime connection state: starting|ready|error|stopped
+  conversations = {}, ---@type table[] ordered, most recently created last
+  by_id = {}, ---@type table<string, table>
+  active = nil, ---@type table|nil
+  seq = 0,
+  activity = {}, ---@type table<string, integer> conv id -> monotonically increasing activity stamp
+  activity_seq = 0,
 }
 
 local function ensure_setup()
@@ -39,15 +27,57 @@ local function ensure_setup()
   end
 end
 
-local function ensure_buffers()
-  if not (state.chat_buf and vim.api.nvim_buf_is_valid(state.chat_buf)) then
-    state.chat_buf = chat.create(state.cfg.keys)
+---@param conv table
+local function touch(conv)
+  state.activity_seq = state.activity_seq + 1
+  state.activity[conv.id] = state.activity_seq
+end
+
+---Create and register a conversation.
+---@param name string|nil
+---@return table conv
+local function new_conversation(name)
+  state.seq = state.seq + 1
+  local conv = Conversation.new(state.cfg, {
+    id = ("ndsh-%d-%d"):format(state.seq, math.random(100000)),
+    name = name or ("chat " .. state.seq),
+  }, {
+    on_send = function(c, text)
+      M._on_send(c, text)
+    end,
+    should_quit = function()
+      -- Only the panel is left in the only tab, it is the only registered
+      -- conversation, and the takeover replaced nothing worth restoring.
+      local only_conv = state.active
+      return #state.conversations == 1
+        and only_conv.takeover
+        and #vim.api.nvim_list_tabpages() == 1
+        and not only_conv.prev_contentful
+        and state.cfg.restore == "quit"
+    end,
+    restore = function(survivor, prev_buf)
+      if prev_buf and vim.api.nvim_buf_is_valid(prev_buf) then
+        vim.api.nvim_win_set_buf(survivor, prev_buf)
+      else
+        M._restore_hook(survivor)
+      end
+    end,
+    conn_state = function()
+      return state.conn
+    end,
+  })
+  state.conversations[#state.conversations + 1] = conv
+  state.by_id[conv.id] = conv
+  touch(conv)
+  return conv
+end
+
+---@return table conv the active conversation, creating the first on demand
+local function active_conversation()
+  if not state.active then
+    state.active = new_conversation(nil)
   end
-  if not (state.input_buf and vim.api.nvim_buf_is_valid(state.input_buf)) then
-    state.input_buf = input.create(state.cfg, function(text)
-      M._on_send(text)
-    end)
-  end
+  return state.active
 end
 
 ---@param opts table|nil
@@ -64,18 +94,17 @@ function M.setup(opts)
       state.cfg.dsh.model = current.model
     end
   end
-  local toggle = state.cfg.keys.toggle
-  if toggle then
-    vim.keymap.set("n", toggle, function()
-      M.toggle()
-    end, { desc = "Toggle ndsh panel" })
+  local function map(key, fn, desc)
+    if key then
+      vim.keymap.set("n", key, fn, { desc = desc })
+    end
   end
-  local toggle_full = state.cfg.keys.toggle_full
-  if toggle_full then
-    vim.keymap.set("n", toggle_full, function()
-      M.toggle_full()
-    end, { desc = "Toggle ndsh panel (full screen)" })
-  end
+  map(state.cfg.keys.toggle, M.toggle, "Toggle ndsh panel")
+  map(state.cfg.keys.toggle_full, M.toggle_full, "Toggle ndsh panel (full screen)")
+  map(state.cfg.keys.sessions, M.sessions, "Navigate ndsh sessions")
+  map(state.cfg.keys.new_session, function()
+    M.new_session()
+  end, "New ndsh session")
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = vim.api.nvim_create_augroup("ndsh_lifecycle", { clear = true }),
     callback = function()
@@ -86,240 +115,29 @@ function M.setup(opts)
   -- the first prompt never waits for it. Deferred so setup() returns first.
   if state.cfg.dsh.auto_connect then
     vim.schedule(function()
-      M._ensure_session()
+      M._ensure_runtime()
     end)
   end
 end
 
----@return boolean
+---@return boolean whether the active conversation's panel is open
 function M.is_open()
-  return state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
+  return state.active ~= nil and state.active:is_open()
 end
 
----Hide panel windows without retriggering the WinClosed teardown.
----@param wins table
-local function hide_guarded(wins)
-  state.closing = true
-  layout.hide(wins)
-  -- WinClosed handlers are scheduled, so the guard lifts after they run.
-  vim.schedule(function()
-    state.closing = false
-  end)
-end
-
----Panel windows are reserved: opening a file while focused in one (e.g. a
----picker's :edit) must not displace the panel. The incoming buffer is
----relocated to a fresh tabpage and the panel buffer is restored, so the
----file still opens — just never inside the panel. A deleted panel buffer
----tears the panel down and it is rebuilt on the next open.
-local function guard_panel_buffers()
-  if state.closing or not state.chat_win then
-    return
-  end
-  if not (state.chat_buf and vim.api.nvim_buf_is_valid(state.chat_buf))
-    or not (state.input_buf and vim.api.nvim_buf_is_valid(state.input_buf))
-  then
-    vim.notify("ndsh: a panel buffer was deleted; closing the panel", vim.log.levels.WARN)
-    M.close()
-    return
-  end
-  local relocated = {}
-  if vim.api.nvim_win_is_valid(state.chat_win)
-    and vim.api.nvim_win_get_buf(state.chat_win) ~= state.chat_buf
-  then
-    relocated[#relocated + 1] = vim.api.nvim_win_get_buf(state.chat_win)
-    vim.api.nvim_win_set_buf(state.chat_win, state.chat_buf)
-  end
-  if vim.api.nvim_win_is_valid(state.input_win)
-    and vim.api.nvim_win_get_buf(state.input_win) ~= state.input_buf
-  then
-    relocated[#relocated + 1] = vim.api.nvim_win_get_buf(state.input_win)
-    vim.api.nvim_win_set_buf(state.input_win, state.input_buf)
-  end
-  for _, buf in ipairs(relocated) do
-    if vim.api.nvim_buf_is_valid(buf) then
-      -- Third-party autocmds fire when the buffer enters the new tab's
-      -- window; their errors must not abort the relocation loop. tabnew's
-      -- fresh listed scratch buffer is deleted so it cannot leak into
-      -- buffer lists (barbar would show it as "buffer N").
-      local ok = pcall(function()
-        vim.cmd("tabnew")
-        local scratch = vim.api.nvim_get_current_buf()
-        vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
-        vim.api.nvim_buf_delete(scratch, { force = true })
-      end)
-      if ok then
-        vim.notify("ndsh: opened in a new tab (panel windows are reserved)", vim.log.levels.INFO)
-      end
-    end
-  end
-end
-
----The panel is one unit: when the user closes either window by hand (:q,
----<C-w>c, ...), tear the whole panel down. Buffers are kept.
-local function watch_windows()
-  local group = vim.api.nvim_create_augroup("ndsh_panel", { clear = true })
-  for _, win in ipairs({ state.chat_win, state.input_win }) do
-    vim.api.nvim_create_autocmd("WinClosed", {
-      group = group,
-      pattern = tostring(win),
-      callback = function()
-        vim.schedule(function()
-          if not state.closing then
-            M.close()
-          end
-        end)
-      end,
-    })
-  end
-  vim.api.nvim_create_autocmd("BufWinEnter", {
-    group = group,
-    callback = function()
-      vim.schedule(guard_panel_buffers)
-    end,
-  })
-  -- Repaint chrome whenever a panel window is entered: external plugins
-  -- that redraw window decorations cannot permanently clobber it.
-  vim.api.nvim_create_autocmd("WinEnter", {
-    group = group,
-    callback = function()
-      if not state.closing then
-        refresh_chrome()
-      end
-    end,
-  })
-end
-
----@param opts { full: boolean|nil }|nil full: open as a full tab even with
----code buffers open (implemented as a new tabpage; closing restores it).
+---@param opts { full: boolean|nil }|nil
 function M.open(opts)
-  opts = opts or {}
   ensure_setup()
-  ensure_buffers()
-  if M.is_open() then
-    if opts.full then
-      -- Already open: jump to the panel's tabpage instead of rebuilding.
-      vim.api.nvim_set_current_tabpage(vim.api.nvim_win_get_tabpage(state.chat_win))
-    elseif vim.api.nvim_win_get_tabpage(state.chat_win) ~= vim.api.nvim_get_current_tabpage() then
-      -- Open in another tab: move the panel here instead of duplicating it.
-      hide_guarded({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
-    else
-      return
-    end
-  end
-  if not M.is_open() then
-    local wins
-    if opts.full then
-      -- Full mode always gets a dedicated tabpage so tab switching between
-      -- code and panel is always available; closing tabs back out. tabnew's
-      -- fresh listed scratch is deleted so it cannot leak into buffer
-      -- lists (barbar would show it as "buffer N").
-      vim.cmd("tabnew")
-      local tab_scratch = vim.api.nvim_get_current_buf()
-      wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
-      state.full_tab = wins.takeover
-      if tab_scratch ~= state.chat_buf and tab_scratch ~= state.input_buf
-        and vim.api.nvim_buf_is_valid(tab_scratch)
-      then
-        pcall(vim.api.nvim_buf_delete, tab_scratch, { force = true })
-      end
-    else
-      wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
-      state.full_tab = false
-    end
-    state.chat_win = wins.chat
-    state.input_win = wins.input
-    state.takeover = wins.takeover
-    state.prev_buf = wins.prev_buf
-    state.prev_contentful = wins.prev_contentful or false
-    refresh_chrome()
-    watch_windows()
-  end
-  M._ensure_session()
-end
-
----Try to show a dashboard in the surviving window after a takeover closes.
----Falls back silently to the scratch buffer already in place.
----@param win integer
-local function restore_dashboard(win)
-  local ok, dash = pcall(require, "config.dashboard")
-  if ok and type(dash.open) == "function" then
-    if pcall(vim.api.nvim_win_call, win, dash.open) then
-      return
-    end
-  end
-  for _, cmd in ipairs({ "Dashboard", "Alpha" }) do
-    if vim.fn.exists(":" .. cmd) == 2 then
-      if pcall(vim.api.nvim_win_call, win, function()
-        vim.cmd(cmd)
-      end) then
-        return
-      end
-    end
-  end
-  local ok_snacks, snacks = pcall(require, "snacks")
-  if ok_snacks and snacks.dashboard and type(snacks.dashboard.open) == "function" then
-    pcall(snacks.dashboard.open)
-  end
+  local conv = active_conversation()
+  conv:open(opts)
+  touch(conv)
+  M._ensure_runtime()
 end
 
 function M.close()
-  local chat_valid = state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
-  local input_valid = state.input_win ~= nil and vim.api.nvim_win_is_valid(state.input_win)
-  if not chat_valid and not input_valid then
-    state.chat_win, state.input_win = nil, nil
-    state.takeover, state.full_tab = false, false
-    state.prev_buf, state.prev_contentful = nil, false
-    return
+  if state.active then
+    state.active:close()
   end
-  -- Only the panel is left in the only tab. A takeover that replaced real
-  -- content (a dashboard or any buffer) restores it on close; a takeover
-  -- from an empty scratch applies the restore mode ("quit" exits Neovim
-  -- like :q on the last file window).
-  local only_pane = state.takeover and #vim.api.nvim_list_tabpages() == 1
-  if only_pane and not state.prev_contentful and state.cfg.restore == "quit" then
-    if pcall(vim.cmd, "quitall") then
-      return
-    end
-  end
-  state.closing = true
-  local survivor = nil
-  if state.full_tab then
-    -- Closing the tabpage closes both panel windows with it.
-    pcall(vim.cmd, "tabclose")
-  else
-    survivor = layout.hide({
-      chat = chat_valid and state.chat_win or nil,
-      input = input_valid and state.input_win or nil,
-    })
-  end
-  state.chat_win = nil
-  state.input_win = nil
-  state.takeover = false
-  state.full_tab = false
-  if survivor and vim.api.nvim_win_is_valid(survivor) then
-    if state.prev_contentful then
-      if state.prev_buf and vim.api.nvim_buf_is_valid(state.prev_buf) then
-        vim.api.nvim_win_set_buf(survivor, state.prev_buf)
-      else
-        -- Some dashboards wipe their buffer when replaced; reopen instead.
-        restore_dashboard(survivor)
-      end
-    else
-      local restore = state.cfg.restore
-      if type(restore) == "function" then
-        pcall(restore, survivor)
-      elseif restore == "dashboard" then
-        restore_dashboard(survivor)
-      end
-    end
-  end
-  state.prev_buf = nil
-  state.prev_contentful = false
-  -- WinClosed handlers are scheduled, so the guard lifts after they run.
-  vim.schedule(function()
-    state.closing = false
-  end)
 end
 
 function M.toggle()
@@ -333,156 +151,201 @@ end
 ---Toggle the full-screen panel: closes it when pressed inside its tab,
 ---converts a docked panel to full-screen, otherwise opens it or jumps to it.
 function M.toggle_full()
-  if not M.is_open() then
+  local conv = active_conversation()
+  if not conv:is_open() then
     M.open({ full = true })
     return
   end
-  local in_panel_tab = vim.api.nvim_win_get_tabpage(state.chat_win) == vim.api.nvim_get_current_tabpage()
-  if state.full_tab and in_panel_tab then
-    M.close()
-  elseif not state.full_tab and not state.takeover then
+  local in_panel_tab = vim.api.nvim_win_get_tabpage(conv.chat_win) == vim.api.nvim_get_current_tabpage()
+  if conv.full_tab and in_panel_tab then
+    conv:close()
+  elseif not conv.full_tab and not conv.takeover then
     -- Docked panel: rebuild as a dedicated full tab.
-    M.close()
-    M.open({ full = true })
+    conv:close()
+    conv:open({ full = true })
+    M._ensure_runtime()
   else
     -- Takeover panel is already full-screen: just focus it.
-    M.open({ full = true })
+    conv:open({ full = true })
   end
 end
 
 function M.focus_input()
-  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
-    vim.fn.win_gotoid(state.input_win)
-    vim.cmd("startinsert")
+  if state.active then
+    state.active:focus_input()
   end
 end
 
----Format a token count compactly: 1234 → "1.2k", 1234567 → "1.2M".
-local function fmt_tokens(n)
-  if n >= 1000000 then
-    return ("%.1fM"):format(n / 1000000)
-  elseif n >= 10000 then
-    return ("%dk"):format(n / 1000)
-  elseif n >= 1000 then
-    return ("%.1fk"):format(n / 1000)
-  end
-  return tostring(n)
+---Create a conversation in a new full-tab panel (:NDSHNew).
+---@param name string|nil
+function M.new_session(name)
+  ensure_setup()
+  local conv = new_conversation(name)
+  state.active = conv
+  conv:open({ full = true })
+  M._ensure_runtime()
+  return conv
 end
 
----Connection state to winbar text outside the ready state.
-local CONN_LABEL = {
-  starting = "connecting…",
-  error = "error (:NDSHRestart)",
-  stopped = "stopped",
-}
-
----Refresh the panel winbar from current state. Everything lives on the
---- chat (input) pane: model and agent status left; working directory and
---- context usage right. The message pane carries no winbar.
---- Winbar, not statusline: statusline plugins (lualine & co.) own and
---- overwrite 'statusline' per window; winbar is untouched by them.
-refresh_chrome = function()
-  if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
-    vim.api.nvim_set_option_value("winbar", "", { win = state.chat_win })
+---Jump to a conversation's tab, opening its panel when detached.
+---@param conv table
+local function goto_conversation(conv)
+  state.active = conv
+  touch(conv)
+  if not conv:is_open() then
+    conv:open({ full = true })
+    M._ensure_runtime()
+  else
+    vim.api.nvim_set_current_tabpage(vim.api.nvim_win_get_tabpage(conv.chat_win))
   end
-  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
-    local model = state.route and state.route.model or state.cfg.dsh.model
-    local status = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
-    local right_parts = {}
-    local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
-    if cwd ~= "" then
-      right_parts[#right_parts + 1] = cwd
+  conv:mark_read()
+end
+
+---Session navigator (:NDSHSessions), most recently active first.
+function M.sessions()
+  ensure_setup()
+  if #state.conversations == 0 then
+    vim.notify("ndsh: no sessions yet; :NDSHNew to create one", vim.log.levels.INFO)
+    return
+  end
+  local ordered = vim.deepcopy(state.conversations)
+  table.sort(ordered, function(a, b)
+    return (state.activity[a.id] or 0) > (state.activity[b.id] or 0)
+  end)
+  -- Current session sinks to the bottom so alternating two is natural.
+  sessions_ui.open(ordered, goto_conversation)
+end
+
+---Rename the active conversation (:NDSHRename and /rename).
+---@param name string|nil prompts when nil
+function M.rename(name)
+  local conv = active_conversation()
+  if name and name ~= "" then
+    conv:rename(name)
+    touch(conv)
+    return
+  end
+  vim.ui.input({ prompt = "Session name: ", default = conv.name }, function(text)
+    if text and text ~= "" then
+      conv:rename(text)
+      touch(conv)
     end
-    if state.context.used then
-      local ctx = fmt_tokens(state.context.used)
-      if state.context.window then
-        -- winbar is statusline syntax: a literal % must be doubled.
-        ctx = ctx .. ("/%s · %d%%%%"):format(
-          fmt_tokens(state.context.window),
-          math.floor(state.context.used / state.context.window * 100 + 0.5)
-        )
-      end
-      right_parts[#right_parts + 1] = ctx
-    end
-    local right = table.concat(right_parts, " · ")
-    input.set_status(
-      state.input_win,
-      ("%s · %s%s"):format(status, model, right ~= "" and "%= " .. right .. " " or "")
-    )
+  end)
+end
+
+---Local slash commands: handled here, never sent to the wire. Unknown
+---slash commands pass through to the runtime's native command routing.
+local slash = {}
+
+---@param args string
+slash["rename"] = function(conv, args)
+  if args == "" then
+    vim.notify("ndsh: /rename needs a name", vim.log.levels.WARN)
+    return
+  end
+  conv:rename(args)
+  vim.notify(("ndsh: session renamed to %s"):format(args), vim.log.levels.INFO)
+end
+
+---Try to handle text as a local slash command.
+---@return boolean handled
+local function run_slash(conv, text)
+  local cmd, args = text:match("^/(%S+)%s*(.-)%s*$")
+  if cmd and slash[cmd] then
+    slash[cmd](conv, args)
+    return true
+  end
+  return false
+end
+
+---Echo input locally, then send it on the conversation's wire session.
+---Accepts (conv, text); a single argument is treated as text on the active
+---conversation (test and dev harness path).
+---@param conv table|string
+---@param text string|nil
+function M._on_send(conv, text)
+  if text == nil then
+    text = conv --[[@as string]]
+    conv = active_conversation()
+  end
+  if run_slash(conv, text) then
+    return
+  end
+  conv:echo_user(text)
+  touch(conv)
+  if not state.runtime then
+    vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
+    return
+  end
+  state.runtime:send(conv.id, text)
+end
+
+---Feed one session event to a conversation by wire session id.
+---@param session_id string
+---@param event table
+function M._route_event(session_id, event)
+  local conv = state.by_id[session_id]
+  if conv then
+    conv:apply_event(event)
   end
 end
 
----Apply one projected writer operation.
----@param op table
-local function apply_op(op)
-  local buf = state.chat_buf
-  if op.op == "begin_message" then
-    chat.begin_message(buf, op.role)
-  elseif op.op == "append" then
-    chat.append(buf, op.text)
-  elseif op.op == "end_message" then
-    chat.end_message(buf)
-  elseif op.op == "tool_begin" then
-    chat.tool_begin(buf, op.id, op.name, op.summary)
-  elseif op.op == "tool_end" then
-    chat.tool_end(buf, op.id, op.ok, op.output)
-  elseif op.op == "error" then
-    chat.error(buf, op.text)
-  elseif op.op == "status" then
-    state.status = op.text
-    refresh_chrome()
-  elseif op.op == "usage" then
-    state.context.used = op.input
-    refresh_chrome()
-  elseif op.op == "route" then
-    state.route = { provider = op.provider, model = op.model }
-    state.context.window = op.window or state.context.window
-    refresh_chrome()
-  end
+---Test/dev hook: apply an event to the active conversation.
+---@param event table
+function M._apply_event(event)
+  active_conversation():apply_event(event)
 end
 
----Create and start the runtime session on first use.
-function M._ensure_session()
-  if state.session or not state.cfg.dsh.auto_connect then
-    if state.session and state.session.state == "stopped" then
-      state.session:start()
+---Create and start the runtime on first use.
+function M._ensure_runtime()
+  if state.runtime then
+    if state.runtime.state == "stopped" then
+      state.runtime:start()
     end
     return
   end
-  state.route = { provider = state.cfg.dsh.provider, model = state.cfg.dsh.model }
-  state.cwd = vim.uv.cwd()
-  state.session = Session.new(state.cfg, {
-    on_event = function(event)
-      M._apply_event(event)
+  state.runtime = Runtime.new(state.cfg, {
+    on_event = function(session_id, event)
+      M._route_event(session_id, event)
     end,
-    on_status = function(status)
-      apply_op({ op = "status", text = status })
+    on_status = function(session_id, status)
+      local conv = state.by_id[session_id]
+      if conv then
+        conv:set_status(status)
+      end
     end,
     on_state = function(conn)
       state.conn = conn
-      refresh_chrome()
+      for _, conv in ipairs(state.conversations) do
+        conv:refresh_chrome()
+      end
     end,
     on_notify = function(msg, level)
       vim.notify(msg, level)
     end,
-    on_approval = prompts.approval,
-    on_user_question = prompts.user_question,
+    on_approval = function(params, respond)
+      local conv = params.sessionId and state.by_id[params.sessionId] or nil
+      prompts.approval(params, respond, conv and conv.name or nil)
+    end,
+    on_user_question = function(params, respond)
+      local conv = params.sessionId and state.by_id[params.sessionId] or nil
+      prompts.user_question(params, respond, conv and conv.name or nil)
+    end,
   })
-  state.session:start()
+  state.runtime:start()
 end
 
 function M.stop_session()
-  if state.session then
-    state.session:stop()
+  if state.runtime then
+    state.runtime:stop()
   end
 end
 
 function M.restart_session()
-  if state.session then
-    state.session:restart()
+  if state.runtime then
+    state.runtime:restart()
   else
-    state.session = nil
-    M._ensure_session()
+    M._ensure_runtime()
   end
 end
 
@@ -588,7 +451,7 @@ end
 
 ---Show the runtime's captured stderr log in a scratch split.
 function M.show_logs()
-  local lines = state.session and state.session:logs() or {}
+  local lines = state.runtime and state.runtime:logs() or {}
   if #lines == 0 then
     lines = { "(no runtime logs)" }
   end
@@ -605,32 +468,36 @@ function M.show_logs()
   end, { buffer = buf, desc = "Close ndsh log" })
 end
 
----Feed one session event through projection and apply the resulting ops.
----@param event table
-function M._apply_event(event)
-  for _, op in ipairs(projection.project(event)) do
-    apply_op(op)
-  end
-  -- Keep the transcript pinned to the newest content while events arrive.
-  if M.is_open() then
-    local n = vim.api.nvim_buf_line_count(state.chat_buf)
-    vim.api.nvim_win_set_cursor(state.chat_win, { n, 0 })
-  end
-end
-
----Echo user input locally, then send it to the runtime. The wire only
----commits user/message when a step admits the input, so the echo is the
----only reliable "You" line; wire user/message events are not rendered.
----@param text string
-function M._on_send(text)
-  apply_op({ op = "begin_message", role = "user" })
-  apply_op({ op = "append", text = text })
-  apply_op({ op = "end_message" })
-  if not state.session then
-    vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
+---Restore hook for a closed takeover with nothing contentful to restore.
+---@param survivor integer
+function M._restore_hook(survivor)
+  local restore = state.cfg.restore
+  if type(restore) == "function" then
+    pcall(restore, survivor)
     return
   end
-  state.session:send(text)
+  if restore ~= "dashboard" then
+    return
+  end
+  local ok, dash = pcall(require, "config.dashboard")
+  if ok and type(dash.open) == "function" then
+    if pcall(vim.api.nvim_win_call, survivor, dash.open) then
+      return
+    end
+  end
+  for _, cmd in ipairs({ "Dashboard", "Alpha" }) do
+    if vim.fn.exists(":" .. cmd) == 2 then
+      if pcall(vim.api.nvim_win_call, survivor, function()
+        vim.cmd(cmd)
+      end) then
+        return
+      end
+    end
+  end
+  local ok_snacks, snacks = pcall(require, "snacks")
+  if ok_snacks and snacks.dashboard and type(snacks.dashboard.open) == "function" then
+    pcall(snacks.dashboard.open)
+  end
 end
 
 ---Run the scripted demo session through the real rendering path.

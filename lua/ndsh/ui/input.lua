@@ -20,16 +20,18 @@ M._map_tab_nav = map_tab_nav
 ---Create the input buffer.
 ---@param cfg table resolved ndsh config
 ---@param on_send fun(text: string)
+---@param suffix string unique name suffix (conversation id)
 ---@return integer buf
-function M.create(cfg, on_send)
+function M.create(cfg, on_send, suffix)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
   vim.api.nvim_set_option_value("bufhidden", "hide", { buf = buf })
   vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
   -- Own filetype so statusline plugins can be disabled for panel windows.
   vim.api.nvim_set_option_value("filetype", "ndshinput", { buf = buf })
-  -- Named, so :edit in the pane cannot reuse this buffer for a file.
-  vim.api.nvim_buf_set_name(buf, "ndsh://input")
+  -- Named (uniquely per conversation), so :edit in the pane cannot reuse
+  -- this buffer for a file.
+  vim.api.nvim_buf_set_name(buf, "ndsh://input/" .. suffix)
 
   local function send()
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)

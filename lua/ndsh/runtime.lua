@@ -1,5 +1,6 @@
---- Session layer: owns the runtime job, the initialize handshake, the
---- prompt path, and routing of wire notifications/requests to UI callbacks.
+--- Runtime layer: owns the dsh process, the initialize handshake, and the
+--- wire demux. Knows nothing about conversations or UI: every session event
+--- is routed to callbacks by the session id embedded in the notification.
 local Job = require("ndsh.job")
 local Protocol = require("ndsh.protocol")
 
@@ -34,23 +35,22 @@ local function resolve_cmd(cfg)
   return nil, "no dsh executable found; set dsh.cmd in setup()"
 end
 
----@class NdsSessionCallbacks
----@field on_event fun(event: table) session-log event for our session
----@field on_status fun(status: string) "running"|"idle"
+---@class NdsRuntimeCallbacks
+---@field on_event fun(session_id: string, event: table) session-log event
+---@field on_status fun(session_id: string, status: string) "running"|"idle"
 ---@field on_state fun(state: string) "starting"|"ready"|"error"|"stopped"
 ---@field on_notify fun(msg: string, level: integer)
 ---@field on_approval fun(params: table, respond: fun(result: any|nil, err: table|nil))
 ---@field on_user_question fun(params: table, respond: fun(result: any|nil, err: table|nil))
 
 ---@param cfg table resolved ndsh config
----@param cb NdsSessionCallbacks
+---@param cb NdsRuntimeCallbacks
 function M.new(cfg, cb)
   return setmetatable({
     cfg = cfg,
     cb = cb,
     state = "stopped",
-    session_id = ("ndsh-%d-%d"):format(os.time(), math.random(100000)),
-    queue = {}, ---@type string[] prompts sent before ready
+    queue = {}, ---@type { session_id: string, text: string }[] prompts before ready
     log = {}, ---@type string[] stderr ring buffer for :NDSHLog
     job = nil,
     protocol = nil,
@@ -72,12 +72,12 @@ end
 
 function M:_notification(method, params)
   if method == "session.event" then
-    if params and params.sessionId == self.session_id then
-      self.cb.on_event(params.event)
+    if params and params.sessionId then
+      self.cb.on_event(params.sessionId, params.event)
     end
   elseif method == "session.status" then
-    if params and params.sessionId == self.session_id then
-      self.cb.on_status(params.status)
+    if params and params.sessionId then
+      self.cb.on_status(params.sessionId, params.status)
     end
   end
 end
@@ -175,25 +175,26 @@ function M:start()
     set_state(self, "ready")
     local queue = self.queue
     self.queue = {}
-    for _, text in ipairs(queue) do
-      self:send(text)
+    for _, item in ipairs(queue) do
+      self:send(item.session_id, item.text)
     end
   end)
 end
 
----Queue or send one user prompt.
+---Queue or send one user prompt on one wire session.
+---@param session_id string
 ---@param text string
-function M:send(text)
+function M:send(session_id, text)
   if self.state == "error" or self.state == "stopped" then
     self.cb.on_notify("ndsh: runtime not running; use :NDSHRestart", vim.log.levels.WARN)
     return
   end
   if self.state ~= "ready" then
-    self.queue[#self.queue + 1] = text
+    self.queue[#self.queue + 1] = { session_id = session_id, text = text }
     return
   end
   self.protocol:request("session/query", {
-    sessionId = self.session_id,
+    sessionId = session_id,
     contentBlocks = { { type = "text", text = text } },
   }, function(_, err)
     if err then
@@ -210,18 +211,19 @@ end
 
 function M:stop()
   -- Invalidate first: callbacks from the dying process are then ignored,
-  -- and stop() itself owns the quiet "stopped" state transition.
+  -- and stop() itself owns the quiet "stopped" state transition. The state
+  -- flips before pending requests fail so their callbacks see "stopped".
   self.gen = (self.gen or 0) + 1
   if self.job then
     self.job:kill()
     self.job = nil
   end
+  if self.state ~= "stopped" then
+    set_state(self, "stopped")
+  end
   if self.protocol then
     self.protocol:fail_all({ code = -32000, message = "stopped" })
     self.protocol = nil
-  end
-  if self.state ~= "stopped" then
-    set_state(self, "stopped")
   end
 end
 

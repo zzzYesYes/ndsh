@@ -27,14 +27,29 @@ set runtimepath+=~/workspace/ndsh
 
 | Command | Action |
 |---|---|
-| `:NDSHToggle` | Toggle the panel (default map: `<leader>ao`) |
-| `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>aO`) |
+| `:NDSHToggle` | Toggle the panel (default map: `<leader>anr`) |
+| `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>anf`) |
+| `:NDSHNew [name]` | New session in its own tab (`<leader>ann`) |
+| `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
+| `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
 | `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
 | `:NDSHModel` | Select the active model (persists; restarts the runtime) |
 | `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
+
+## Multi-session
+
+One runtime multiplexes any number of conversations. Each session is a
+full-tab panel with its own transcript, status, and wire session; switching
+is native `gt`/`gT`. The message pane's winbar shows the session name (with
+an unread ● when activity arrives while hidden); the input pane's winbar
+keeps status, model, working directory, and context usage. Closing a
+session's tab detaches it — transcripts persist and `<leader>ans` brings it
+back. All sessions share the runtime's provider/model (an SDK limitation;
+see docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
+current session locally; other slash commands pass through to the runtime.
 
 Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
 panel takes the whole tab like a full-screen TUI session; with code buffers

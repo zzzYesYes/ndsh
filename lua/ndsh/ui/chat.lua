@@ -76,8 +76,9 @@ end
 
 ---Create the chat buffer and its buffer-local conveniences.
 ---@param keys table|nil cfg.keys for optional tab navigation maps
+---@param suffix string unique name suffix (conversation id)
 ---@return integer buf
-function M.create(keys)
+function M.create(keys, suffix)
   M._ns = M._ns or vim.api.nvim_create_namespace("ndsh")
   vim.api.nvim_set_hl(0, "NDSHUserHeader", { link = "Title", default = true })
   vim.api.nvim_set_hl(0, "NDSHAssistantHeader", { link = "Comment", default = true })
@@ -93,8 +94,9 @@ function M.create(keys)
   -- Own filetype so statusline plugins can be disabled for panel windows;
   -- markdown treesitter highlighting is attached explicitly (soft dep).
   vim.api.nvim_set_option_value("filetype", "ndsh", { buf = buf })
-  -- Named, so :edit in the pane cannot reuse this buffer for a file.
-  vim.api.nvim_buf_set_name(buf, "ndsh://chat")
+  -- Named (uniquely per conversation), so :edit in the pane cannot reuse
+  -- this buffer for a file.
+  vim.api.nvim_buf_set_name(buf, "ndsh://chat/" .. suffix)
   pcall(vim.treesitter.start, buf, "markdown")
   states[buf] = { empty = true, msg_open = false, tools = {} }
 

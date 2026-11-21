@@ -1,24 +1,38 @@
 --- Dependency tripwire: every require() in lua/ndsh must resolve to an
---- ndsh module. Any external module is a dependency and must be declared
---- in docs/dependencies.md first. Run from the repo root:
+--- ndsh module or a declared soft integration. Any other external module
+--- is a dependency and must be declared in docs/dependencies.md first.
+--- Run from the repo root:
 ---   nvim --headless -u NONE -l tests/deps.lua
 local failures = 0
 
+---Declared soft integrations (docs/dependencies.md): loaded optionally via
+---pcall and required to degrade gracefully when absent.
+local ALLOWED = { "^telescope" }
+
 local files = vim.fn.globpath("lua/ndsh", "**/*.lua", true, true)
 assert(#files > 0, "no lua/ndsh files found; run from the repo root")
+
+local function allowed(mod)
+  for _, pattern in ipairs(ALLOWED) do
+    if mod:find(pattern) then
+      return true
+    end
+  end
+  return false
+end
 
 for _, file in ipairs(files) do
   for lnum, line in ipairs(vim.fn.readfile(file)) do
     -- require("mod"), require "mod"; comment lines are ignored.
     local stripped = line:gsub("%-%-.*$", "")
     for mod in stripped:gmatch('require%s*%(%s*["\']([^"\']+)["\']') do
-      if not mod:find("^ndsh") then
+      if not mod:find("^ndsh") and not allowed(mod) then
         failures = failures + 1
         print(("FAIL - %s:%d requires external module %q (declare it in docs/dependencies.md)"):format(file, lnum, mod))
       end
     end
     for mod in stripped:gmatch('require%s+["\']([^"\']+)["\']') do
-      if not mod:find("^ndsh") then
+      if not mod:find("^ndsh") and not allowed(mod) then
         failures = failures + 1
         print(("FAIL - %s:%d requires external module %q (declare it in docs/dependencies.md)"):format(file, lnum, mod))
       end

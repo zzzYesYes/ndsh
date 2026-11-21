@@ -6,13 +6,17 @@ local M = {}
 --- approval/request: one-shot allow/reject/cancel for one tool operation.
 ---@param params { toolName: string, reason: string|nil }
 ---@param respond fun(result: any|nil, err: table|nil)
-function M.approval(params, respond)
+---@param conv_name string|nil session the approval belongs to
+function M.approval(params, respond, conv_name)
   local choices = {
     { label = "Allow once", outcome = "allowed-once" },
     { label = "Reject", outcome = "rejected" },
     { label = "Cancel turn", outcome = "cancelled" },
   }
-  local prompt = ("ndsh: allow %s?"):format(params.toolName or "tool")
+  local prompt = ("ndsh%s: allow %s?"):format(
+    conv_name and (" [" .. conv_name .. "]") or "",
+    params.toolName or "tool"
+  )
   if params.reason then
     prompt = prompt .. "\n" .. params.reason
   end
@@ -33,9 +37,10 @@ end
 
 ---Ask one question, then continue the batch.
 ---@param q table AskUserQuestionItem
+---@param prefix string prompt prefix (session attribution)
 ---@param done fun(answer: table|nil) nil when dismissed
-local function ask_one(q, done)
-  local prompt = (q.header and (q.header .. " — ") or "") .. (q.question or "")
+local function ask_one(q, prefix, done)
+  local prompt = prefix .. (q.header and (q.header .. " — ") or "") .. (q.question or "")
   if q.detail then
     prompt = prompt .. "\n" .. q.detail
   end
@@ -67,9 +72,11 @@ end
 --- user-question/ask: answer every question in order, or cancel the batch.
 ---@param params { questions: table[] }
 ---@param respond fun(result: any|nil, err: table|nil)
-function M.user_question(params, respond)
+---@param conv_name string|nil session the questions belong to
+function M.user_question(params, respond, conv_name)
   local answers = {}
   local questions = params.questions or {}
+  local prefix = conv_name and ("[" .. conv_name .. "] ") or ""
   local i = 0
   local function step()
     i = i + 1
@@ -77,7 +84,7 @@ function M.user_question(params, respond)
       respond({ answers = answers })
       return
     end
-    ask_one(questions[i], function(answer)
+    ask_one(questions[i], prefix, function(answer)
       if answer == nil then
         respond({ cancelled = true })
         return

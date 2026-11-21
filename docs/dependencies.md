@@ -28,6 +28,7 @@ under `nvim -u NONE` to prove this stays true.
 | Plugin | Used for | Without it |
 |---|---|---|
 | nvim-treesitter (markdown parser) | assistant output highlighting | plain text |
+| telescope | session navigator UI (`:NDSHSessions`) | `vim.ui.select` picker |
 | dressing.nvim / any `vim.ui` override | approvals, questions, pickers | builtin cmdline UI |
 | startup.nvim / dashboard plugins | restore after takeover close | scratch buffer |
 | lazy.nvim | install mechanism | plain runtimepath works |
