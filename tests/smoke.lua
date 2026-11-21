@@ -159,6 +159,27 @@ check("reopen after manual close: clean 3 windows", #vim.api.nvim_tabpage_list_w
 ndsh.close()
 check("final close: back to code window", #vim.api.nvim_tabpage_list_wins(0) == wins_after)
 
+-- 9. Buffer navigation inside a panel window snaps the panel buffer back.
+vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
+ndsh.open()
+local foreign = vim.api.nvim_create_buf(true, false)
+local chat_win9 = vim.fn.bufwinid(chat_buf)
+vim.api.nvim_win_set_buf(chat_win9, foreign)
+vim.wait(200, function()
+  return vim.api.nvim_win_get_buf(chat_win9) == chat_buf
+end)
+check("panel window snaps its buffer back", vim.api.nvim_win_get_buf(chat_win9) == chat_buf)
+
+-- 10. Deleting a panel buffer tears the panel down; reopen rebuilds it.
+vim.api.nvim_buf_delete(input_buf, { force = true })
+vim.wait(200, function()
+  return not ndsh.is_open()
+end)
+check("deleting a panel buffer closes the panel", not ndsh.is_open())
+ndsh.open()
+check("reopen rebuilds panel buffers", ndsh.is_open() and #vim.api.nvim_tabpage_list_wins(0) == 3)
+ndsh.close()
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

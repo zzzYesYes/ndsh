@@ -2,6 +2,21 @@
 --- that hands the complete buffer text to the session layer and clears it.
 local M = {}
 
+---Buffer-local tab navigation shared by both panel buffers.
+---@param buf integer
+---@param keys table cfg.keys
+local function map_tab_nav(buf, keys)
+  if keys.tabnext then
+    vim.keymap.set("n", keys.tabnext, "<cmd>tabnext<cr>", { buffer = buf, desc = "Next tab" })
+  end
+  if keys.tabprev then
+    vim.keymap.set("n", keys.tabprev, "<cmd>tabprevious<cr>", { buffer = buf, desc = "Previous tab" })
+  end
+end
+
+---Exported for ui/chat, which shares these panel-local maps.
+M._map_tab_nav = map_tab_nav
+
 ---Create the input buffer.
 ---@param cfg table resolved ndsh config
 ---@param on_send fun(text: string)
@@ -27,6 +42,7 @@ function M.create(cfg, on_send)
     vim.keymap.set({ "i", "n" }, key, send, { buffer = buf, desc = "Send ndsh message" })
   end
   vim.keymap.set("n", "<CR>", send, { buffer = buf, desc = "Send ndsh message" })
+  map_tab_nav(buf, cfg.keys)
   return buf
 end
 

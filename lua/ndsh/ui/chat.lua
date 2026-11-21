@@ -75,8 +75,9 @@ local function fold_range(buf, first, last)
 end
 
 ---Create the chat buffer and its buffer-local conveniences.
+---@param keys table|nil cfg.keys for optional tab navigation maps
 ---@return integer buf
-function M.create()
+function M.create(keys)
   M._ns = M._ns or vim.api.nvim_create_namespace("ndsh")
   vim.api.nvim_set_hl(0, "NDSHUserHeader", { link = "Title", default = true })
   vim.api.nvim_set_hl(0, "NDSHAssistantHeader", { link = "Comment", default = true })
@@ -99,6 +100,7 @@ function M.create()
     require("ndsh").focus_input()
   end, { buffer = buf, desc = "Jump to ndsh input" })
   vim.keymap.set("n", "<Tab>", "za", { buffer = buf, desc = "Toggle fold" })
+  require("ndsh.ui.input")._map_tab_nav(buf, keys or {})
   return buf
 end
 

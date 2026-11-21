@@ -28,7 +28,7 @@ end
 
 local function ensure_buffers()
   if not (state.chat_buf and vim.api.nvim_buf_is_valid(state.chat_buf)) then
-    state.chat_buf = chat.create()
+    state.chat_buf = chat.create(state.cfg.keys)
   end
   if not (state.input_buf and vim.api.nvim_buf_is_valid(state.input_buf)) then
     state.input_buf = input.create(state.cfg, function(text)
@@ -64,6 +64,39 @@ local function hide_guarded(wins)
   end)
 end
 
+---Panel windows are reserved: buffer navigation inside them (barbar's
+---:BufferNext et al. operates on the current window) must not replace their
+---buffers. Snap replaced buffers back; a deleted panel buffer tears the
+---panel down and it is rebuilt on the next open.
+local function guard_panel_buffers()
+  if state.closing or not state.chat_win then
+    return
+  end
+  if not (state.chat_buf and vim.api.nvim_buf_is_valid(state.chat_buf))
+    or not (state.input_buf and vim.api.nvim_buf_is_valid(state.input_buf))
+  then
+    vim.notify("ndsh: a panel buffer was deleted; closing the panel", vim.log.levels.WARN)
+    M.close()
+    return
+  end
+  local snapped = false
+  if vim.api.nvim_win_is_valid(state.chat_win)
+    and vim.api.nvim_win_get_buf(state.chat_win) ~= state.chat_buf
+  then
+    vim.api.nvim_win_set_buf(state.chat_win, state.chat_buf)
+    snapped = true
+  end
+  if vim.api.nvim_win_is_valid(state.input_win)
+    and vim.api.nvim_win_get_buf(state.input_win) ~= state.input_buf
+  then
+    vim.api.nvim_win_set_buf(state.input_win, state.input_buf)
+    snapped = true
+  end
+  if snapped then
+    vim.notify("ndsh: panel windows are reserved; close the panel to reuse them", vim.log.levels.INFO)
+  end
+end
+
 ---The panel is one unit: when the user closes either window by hand (:q,
 ---<C-w>c, ...), tear the whole panel down. Buffers are kept.
 local function watch_windows()
@@ -81,6 +114,12 @@ local function watch_windows()
       end,
     })
   end
+  vim.api.nvim_create_autocmd("BufWinEnter", {
+    group = group,
+    callback = function()
+      vim.schedule(guard_panel_buffers)
+    end,
+  })
 end
 
 ---@param opts { full: boolean|nil }|nil full: open as a full tab even with

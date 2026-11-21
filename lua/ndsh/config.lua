@@ -18,6 +18,12 @@ M.defaults = {
     send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
     toggle = "<leader>ao",
+    --- Optional buffer-local tab navigation inside panel windows. Useful
+    --- when your global "tab" keys operate on buffers (e.g. barbar): they
+    --- are meaningless inside the reserved panel windows, so bind them to
+    --- real tabpage movement here. Nil leaves the global mapping alone.
+    tabnext = nil, ---@type string|nil
+    tabprev = nil, ---@type string|nil
   },
   --- What fills the surviving window when a full-tab takeover closes:
   --- "dashboard" (try config.dashboard, :Dashboard, :Alpha, snacks.dashboard),
