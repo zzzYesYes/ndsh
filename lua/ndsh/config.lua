@@ -32,6 +32,10 @@ M.defaults = {
   --- "dashboard" (try config.dashboard, :Dashboard, :Alpha, snacks.dashboard),
   --- "scratch" (empty buffer), or fun(win: integer) for a custom restore.
   restore = "quit",
+  --- Path of the credentials/model-selection store; nil uses
+  --- stdpath("data")/ndsh/credentials.json. Tests and isolated setups
+  --- point this elsewhere.
+  store_path = nil, ---@type string|nil
   --- dsh runtime connection.
   dsh = {
     --- Explicit runtime argv; nil resolves an installed `dsh`, then the

@@ -111,7 +111,7 @@ function M:start()
   set_state(self, "starting")
   -- Stored credentials for the active provider ride the process
   -- environment; static dsh.env entries merge underneath them.
-  local env = vim.tbl_extend("force", self.cfg.dsh.env or {}, require("ndsh.credentials").env_for(self.cfg.dsh.provider))
+  local env = vim.tbl_extend("force", self.cfg.dsh.env or {}, require("ndsh.credentials").env_for(self.cfg.dsh.provider, self.cfg.store_path))
   local ok, job_or_err = pcall(Job.spawn, cmd, {
     env = next(env) and env or nil,
     on_frame = function(line)

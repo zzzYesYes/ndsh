@@ -49,7 +49,7 @@ function M.setup(opts)
   -- defaults; explicit configuration always wins over stored selection.
   local explicit = opts.dsh and (opts.dsh.provider ~= nil or opts.dsh.model ~= nil)
   if not explicit then
-    local current = require("ndsh.credentials").current()
+    local current = require("ndsh.credentials").current(state.cfg.store_path)
     if current then
       state.cfg.dsh.provider = current.provider
       state.cfg.dsh.model = current.model
@@ -389,8 +389,8 @@ function M.connect()
           return
         end
         local credentials = require("ndsh.credentials")
-        credentials.set(provider.id, { env = env, model = model })
-        credentials.set_current(provider.id, model)
+        credentials.set(provider.id, { env = env, model = model }, state.cfg.store_path)
+        credentials.set_current(provider.id, model, state.cfg.store_path)
         state.cfg.dsh.provider = provider.id
         state.cfg.dsh.model = model
         M.restart_session()
@@ -424,7 +424,7 @@ end
 function M.select_model()
   ensure_setup()
   local credentials = require("ndsh.credentials")
-  local store = credentials.load()
+  local store = credentials.load(state.cfg.store_path)
   local candidates, seen = {}, {}
   local function add(provider, model, label)
     if not provider or not model then
@@ -460,7 +460,7 @@ function M.select_model()
     if not choice then
       return
     end
-    credentials.set_current(choice.provider, choice.model)
+    credentials.set_current(choice.provider, choice.model, state.cfg.store_path)
     state.cfg.dsh.provider = choice.provider
     state.cfg.dsh.model = choice.model
     M.restart_session()
