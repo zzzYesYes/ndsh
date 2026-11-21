@@ -29,7 +29,7 @@ set runtimepath+=~/workspace/ndsh
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ao`) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
-| `:NDSHOpen!` | Open as a full-screen tab regardless of what's open |
+| `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>aO`) |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 
 Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
