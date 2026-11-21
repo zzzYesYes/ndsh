@@ -76,7 +76,12 @@ begins a new session. Extra routes can be declared via `dsh.models`, e.g.
 ## Test
 
 ```sh
+nvim --headless -u NONE -l tests/deps.lua                                     # dependency tripwire
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/unit.lua        # protocol/framing units
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/smoke.lua       # UI frame
+nvim --headless -u NONE --cmd "set rtp+=." -l tests/features.lua    # connect/model flows
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/integration.lua # full stack vs tests/fixtures/fake_dsh.py
 ```
+
+Dependencies are inventoried in [docs/dependencies.md](docs/dependencies.md)
+and updated in the same commit that introduces one.
