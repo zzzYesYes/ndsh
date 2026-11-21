@@ -46,6 +46,12 @@ function M.setup(opts)
       M.toggle()
     end, { desc = "Toggle ndsh panel" })
   end
+  local toggle_full = state.cfg.keys.toggle_full
+  if toggle_full then
+    vim.keymap.set("n", toggle_full, function()
+      M.toggle_full()
+    end, { desc = "Toggle ndsh panel (full screen)" })
+  end
 end
 
 ---@return boolean
@@ -235,6 +241,26 @@ function M.toggle()
     M.close()
   else
     M.open()
+  end
+end
+
+---Toggle the full-screen panel: closes it when pressed inside its tab,
+---converts a docked panel to full-screen, otherwise opens it or jumps to it.
+function M.toggle_full()
+  if not M.is_open() then
+    M.open({ full = true })
+    return
+  end
+  local in_panel_tab = vim.api.nvim_win_get_tabpage(state.chat_win) == vim.api.nvim_get_current_tabpage()
+  if state.full_tab and in_panel_tab then
+    M.close()
+  elseif not state.full_tab and not state.takeover then
+    -- Docked panel: rebuild as a dedicated full tab.
+    M.close()
+    M.open({ full = true })
+  else
+    -- Takeover panel is already full-screen: just focus it.
+    M.open({ full = true })
   end
 end
 

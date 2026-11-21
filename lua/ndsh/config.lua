@@ -18,6 +18,8 @@ M.defaults = {
     send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
     toggle = "<leader>ao",
+    --- Global full-screen panel toggle; nil to define your own.
+    toggle_full = "<leader>aO",
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
     --- are meaningless inside the reserved panel windows, so bind them to

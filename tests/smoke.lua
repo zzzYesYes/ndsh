@@ -149,6 +149,16 @@ check("full from dashboard: still a dedicated tab", #vim.api.nvim_list_tabpages(
 ndsh.close()
 check("full from dashboard close: tab restored", #vim.api.nvim_list_tabpages() == tabs_before)
 
+-- 7b. toggle_full: docked converts to full; pressed inside the full tab it
+-- closes back out.
+vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
+ndsh.open()
+check("toggle_full setup: docked 3 windows", #vim.api.nvim_tabpage_list_wins(0) == 3)
+ndsh.toggle_full()
+check("toggle_full: docked converts to full tab", #vim.api.nvim_list_tabpages() == 2 and #vim.api.nvim_tabpage_list_wins(0) == 2)
+ndsh.toggle_full()
+check("toggle_full: pressed inside closes back out", #vim.api.nvim_list_tabpages() == 1)
+
 -- 8. Closing one panel window by hand tears the whole panel down.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
 ndsh.open()
