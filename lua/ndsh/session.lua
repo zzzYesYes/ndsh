@@ -165,6 +165,9 @@ function M:start()
   end
   self.protocol:request("initialize", init, function(_, init_err)
     if init_err then
+      if self.state == "stopped" then
+        return -- rejected by an intentional stop during shutdown; not a failure
+      end
       set_state(self, "error")
       self.cb.on_notify("ndsh: initialize failed: " .. vim.inspect(init_err), vim.log.levels.ERROR)
       return

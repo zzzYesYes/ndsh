@@ -160,6 +160,16 @@ local function watch_windows()
       vim.schedule(guard_panel_buffers)
     end,
   })
+  -- Repaint chrome whenever a panel window is entered: external plugins
+  -- that redraw window decorations cannot permanently clobber it.
+  vim.api.nvim_create_autocmd("WinEnter", {
+    group = group,
+    callback = function()
+      if not state.closing then
+        refresh_chrome()
+      end
+    end,
+  })
 end
 
 ---@param opts { full: boolean|nil }|nil full: open as a full tab even with
