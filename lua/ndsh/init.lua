@@ -73,6 +73,13 @@ function M.setup(opts)
       M.stop_session()
     end,
   })
+  -- Connect eagerly: the runtime boots in the background at plugin load so
+  -- the first prompt never waits for it. Deferred so setup() returns first.
+  if state.cfg.dsh.auto_connect then
+    vim.schedule(function()
+      M._ensure_session()
+    end)
+  end
 end
 
 ---@return boolean

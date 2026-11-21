@@ -86,7 +86,20 @@ local approved = vim.wait(10000, function()
 end, 100)
 check("approval request answered and rendered", approved)
 
--- 3. Graceful stop: no error state, winbar shows stopped.
+-- 3. Restart races a booting/finished process: the new generation must
+-- reach ready and serve prompts; the old process's exit must not poison it.
+ndsh.restart_session()
+local re_ready = vim.wait(10000, function()
+  return winbar_text(input_win) == " ndsh · idle"
+end, 50)
+check("restart reaches ready", re_ready)
+ndsh._on_send("after restart")
+local second = vim.wait(10000, function()
+  return chat_text():find("FAKE%-OUTRO: after restart") ~= nil
+end, 100)
+check("prompt after restart renders", second)
+
+-- 4. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()
 local stopped = vim.wait(5000, function()
   return winbar_text(input_win) == " ndsh · stopped"

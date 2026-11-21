@@ -42,7 +42,8 @@ M.defaults = {
     --- ~/workspace/deepseek-harness source checkout via pnpm.
     cmd = nil, ---@type string[]|nil
     profile = "sdk",
-    --- Connect when the panel opens; false connects only on :NDSHRestart.
+    --- Connect at plugin load (and when the panel opens); false connects
+    --- only on :NDSHRestart.
     auto_connect = true,
     provider = "deepseek-official",
     model = "deepseek-v4-flash",

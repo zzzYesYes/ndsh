@@ -66,12 +66,6 @@ function M:_on_exit(code)
   if self.protocol then
     self.protocol:fail_all({ code = -32000, message = "runtime exited (code " .. tostring(code) .. ")" })
   end
-  if self.stopping then
-    -- Intentional kill from stop(): quiet teardown, not an error.
-    self.stopping = false
-    set_state(self, "stopped")
-    return
-  end
   set_state(self, "error")
   self.cb.on_notify("ndsh: runtime exited (code " .. tostring(code) .. "); :NDSHRestart to respawn", vim.log.levels.ERROR)
 end
@@ -108,6 +102,10 @@ function M:start()
     self.cb.on_notify("ndsh: " .. err, vim.log.levels.ERROR)
     return
   end
+  -- Generation guard: callbacks from a previous (killed) process must not
+  -- touch the new protocol or state. stop() invalidates the generation.
+  self.gen = (self.gen or 0) + 1
+  local gen = self.gen
   set_state(self, "starting")
   -- Stored credentials for the active provider ride the process
   -- environment; static dsh.env entries merge underneath them.
@@ -115,8 +113,7 @@ function M:start()
   local ok, job_or_err = pcall(Job.spawn, cmd, {
     env = next(env) and env or nil,
     on_frame = function(line)
-      -- Frames can arrive after stop() tore the protocol down.
-      if self.protocol then
+      if self.gen == gen and self.protocol then
         self.protocol:handle_line(line)
       end
     end,
@@ -129,6 +126,9 @@ function M:start()
       end
     end,
     on_exit = function(code)
+      if self.gen ~= gen then
+        return
+      end
       self:_on_exit(code)
     end,
   })
@@ -206,8 +206,10 @@ function M:logs()
 end
 
 function M:stop()
+  -- Invalidate first: callbacks from the dying process are then ignored,
+  -- and stop() itself owns the quiet "stopped" state transition.
+  self.gen = (self.gen or 0) + 1
   if self.job then
-    self.stopping = true
     self.job:kill()
     self.job = nil
   end
