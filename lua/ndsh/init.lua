@@ -130,7 +130,8 @@ function M.open(opts)
   ensure_buffers()
   if M.is_open() then
     if opts.full then
-      M.close()
+      -- Already open: jump to the panel's tabpage instead of rebuilding.
+      vim.api.nvim_set_current_tabpage(vim.api.nvim_win_get_tabpage(state.chat_win))
     elseif vim.api.nvim_win_get_tabpage(state.chat_win) ~= vim.api.nvim_get_current_tabpage() then
       -- Open in another tab: move the panel here instead of duplicating it.
       hide_guarded({ chat = state.chat_win, input = state.input_win, takeover = state.takeover })
@@ -138,20 +139,24 @@ function M.open(opts)
       return
     end
   end
-  local full_tab = false
-  if opts.full and not layout.is_takeover_tab() then
-    -- Full-screen over existing content would destroy windows; a fresh tab
-    -- gives the same area non-destructively and tabs back out on close.
-    vim.cmd("tabnew")
-    full_tab = true
+  if not M.is_open() then
+    local wins
+    if opts.full then
+      -- Full mode always gets a dedicated tabpage so tab switching between
+      -- code and panel is always available; closing tabs back out.
+      vim.cmd("tabnew")
+      wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
+      state.full_tab = wins.takeover
+    else
+      wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
+      state.full_tab = false
+    end
+    state.chat_win = wins.chat
+    state.input_win = wins.input
+    state.takeover = wins.takeover
+    input.set_status(state.input_win, state.status)
+    watch_windows()
   end
-  local wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
-  state.chat_win = wins.chat
-  state.input_win = wins.input
-  state.takeover = wins.takeover
-  state.full_tab = full_tab and wins.takeover
-  input.set_status(state.input_win, state.status)
-  watch_windows()
 end
 
 ---Try to show a dashboard in the surviving window after a takeover closes.

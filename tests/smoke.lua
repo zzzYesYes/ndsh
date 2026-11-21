@@ -128,7 +128,8 @@ wins = vim.api.nvim_tabpage_list_wins(0)
 check("dashboard: panel takes over (2 windows)", #wins == 2)
 ndsh.close()
 
--- 7. Explicit full mode over a code buffer opens a dedicated tab.
+-- 7. Explicit full mode always opens a dedicated tab, even from a
+-- dashboard-style single window, so gt/gT always has somewhere to go.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
 local tabs_before = #vim.api.nvim_list_tabpages()
 ndsh.open({ full = true })
@@ -140,6 +141,13 @@ check(
   "full close: tabpage restored",
   #vim.api.nvim_list_tabpages() == tabs_before and #vim.api.nvim_tabpage_list_wins(0) == 1
 )
+vim.cmd("enew")
+vim.api.nvim_set_option_value("buftype", "nofile", { buf = 0 })
+tabs_before = #vim.api.nvim_list_tabpages()
+ndsh.open({ full = true })
+check("full from dashboard: still a dedicated tab", #vim.api.nvim_list_tabpages() == tabs_before + 1)
+ndsh.close()
+check("full from dashboard close: tab restored", #vim.api.nvim_list_tabpages() == tabs_before)
 
 -- 8. Closing one panel window by hand tears the whole panel down.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
