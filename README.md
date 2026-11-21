@@ -40,8 +40,8 @@ splits untouched; closing it tabs back out.
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
 native. Chat buffer locals: `q` closes, `i` jumps to input, `<Tab>` toggles
-tool-result folds. Input: `<C-CR>` (terminals with extended keys) or `<C-s>`
-sends, `<CR>` is a newline; in normal mode `<CR>` also sends.
+tool-result folds. Input: `<C-s>` sends (insert and normal mode), `<CR>` is a
+plain newline in insert mode and sends in normal mode.
 
 ## Test
 

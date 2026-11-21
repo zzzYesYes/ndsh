@@ -13,9 +13,9 @@ M.defaults = {
   --- Input window height in rows.
   input_height = 6,
   keys = {
-    --- Send from the input buffer (insert and normal mode). <C-CR> needs a
-    --- terminal with extended keyboard support; <C-s> is the portable alias.
-    send = { "<C-CR>", "<C-s>" },
+    --- Send from the input buffer (insert and normal mode). Normal-mode
+    --- <CR> also sends; insert-mode <CR> is always a plain newline.
+    send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
     toggle = "<leader>ao",
   },
