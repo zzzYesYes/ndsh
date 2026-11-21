@@ -18,8 +18,6 @@ M.defaults = {
     send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
     toggle = "<leader>anr",
-    --- Global full-screen panel toggle; nil to define your own.
-    toggle_full = "<leader>anf",
     --- Session navigator and new-session mappings; nil to define your own.
     sessions = "<leader>ans",
     new_session = "<leader>ann",

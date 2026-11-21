@@ -28,8 +28,7 @@ set runtimepath+=~/workspace/ndsh
 | Command | Action |
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>anr`) |
-| `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>anf`) |
-| `:NDSHNew [name]` | New session in its own tab (`<leader>ann`) |
+| `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
 | `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
@@ -41,26 +40,25 @@ set runtimepath+=~/workspace/ndsh
 
 ## Multi-session
 
-One runtime multiplexes any number of conversations. Each session is a
-full-tab panel with its own transcript, status, and wire session; switching
-is native `gt`/`gT`. The message pane's winbar shows the session name (with
-an unread ● when activity arrives while hidden); the input pane's winbar
-keeps status, model, working directory, and context usage. Closing a
-session's tab detaches it — transcripts persist and `<leader>ans` brings it
-back. All sessions share the runtime's provider/model (an SDK limitation;
-see docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
+One runtime multiplexes any number of conversations. The right-docked panel
+shows one session at a time; `:NDSHNew` and the navigator swap its contents,
+and each session keeps its own transcript, status, and wire session in the
+background. The message pane's winbar shows the session name (with an
+unread ● when activity arrives while hidden); the input pane's winbar keeps
+status, model, working directory, and context usage. Closing the panel
+detaches the session — transcripts persist and `<leader>ans` brings it back.
+All sessions share the runtime's provider/model (an SDK limitation; see
+docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
 current session locally; other slash commands pass through to the runtime.
 
 Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
 panel takes the whole tab like a full-screen TUI session; with code buffers
 open it docks right by default (`layout = "right" | "bottom" | "float"`).
-`:NDSHOpen!` forces full-screen by opening a dedicated tab, leaving your
-splits untouched; closing it tabs back out. When a takeover panel is the
-only pane left, closing restores what was there: the replaced content (a
-dashboard or any buffer, reopened if it self-wiped), or — from an empty
-scratch — Neovim exits like `:q` on the last file window (`restore =
-"quit"`, the default); alternatives are `"dashboard"`, `"scratch"`, or a
-`fun(win)` hook.
+When a takeover panel is the only pane left, closing restores what was
+there: the replaced content (a dashboard or any buffer, reopened if it
+self-wiped), or — from an empty scratch — Neovim exits like `:q` on the
+last file window (`restore = "quit"`, the default); alternatives are
+`"dashboard"`, `"scratch"`, or a `fun(win)` hook.
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
 native. The chat (input) pane's winbar carries all chrome: agent status and

@@ -54,9 +54,11 @@ local chat_buf = find_chat_buf()
 check("panel opened with chat buffer", chat_buf ~= nil)
 
 local input_win
+local input1_buf
 for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
   if vim.api.nvim_win_get_buf(win) ~= chat_buf then
     input_win = win
+    input1_buf = vim.api.nvim_win_get_buf(win)
   end
 end
 
@@ -121,10 +123,10 @@ local second = vim.wait(10000, function()
 end, 100)
 check("prompt after restart renders", second)
 
--- 4. Multi-session: a second conversation gets its own tab, transcript and
--- status; the first conversation is untouched.
+-- 4. Multi-session: a new conversation swaps the panel's contents; the
+-- first conversation's transcript persists untouched.
 local conv2 = ndsh.new_session()
-check("new session opens a second tab", #vim.api.nvim_list_tabpages() == 2)
+check("new session keeps a single tab", #vim.api.nvim_list_tabpages() == 1)
 local chat2_buf
 for _, b in ipairs(vim.api.nvim_list_bufs()) do
   if vim.api.nvim_get_option_value("filetype", { buf = b }) == "ndsh" and b ~= chat_buf then
@@ -132,6 +134,8 @@ for _, b in ipairs(vim.api.nvim_list_bufs()) do
   end
 end
 check("second conversation has its own chat buffer", chat2_buf ~= nil)
+check("panel now shows the second conversation", vim.fn.bufwinid(chat2_buf) ~= -1)
+check("first conversation's window is hidden", vim.fn.bufwinid(chat_buf) == -1)
 local function chat2_text()
   return table.concat(vim.api.nvim_buf_get_lines(chat2_buf, 0, -1, false), "\n")
 end
@@ -146,7 +150,7 @@ check(
     and chat_text():find("second conversation here", 1, true) == nil
 )
 check(
-  "second tab winbar shows its session name",
+  "winbar shows the second session name",
   winbar_text(vim.fn.bufwinid(chat2_buf)):find("chat 2", 1, true) ~= nil
 )
 
@@ -168,19 +172,33 @@ for _, b in ipairs(vim.api.nvim_list_bufs()) do
   end
 end
 vim.api.nvim_buf_set_lines(input2_buf, 0, -1, false, { "/rename work" })
-local input2_win = vim.fn.bufwinid(input2_buf)
 local has_match = false
-for _, m in ipairs(vim.fn.getmatches(input2_win)) do
+for _, m in ipairs(vim.fn.getmatches(vim.fn.bufwinid(input2_buf))) do
   if m.group == "NDSHSlashCommand" then
     has_match = true
   end
 end
 check("input pane highlights local slash commands", has_match)
 
--- 6. Graceful stop: no error state, winbar shows stopped.
+-- 6. The navigator (vim.ui fallback) switches the panel back to chat 1.
+vim.ui.select = function(items, _, on_choice)
+  for i, item in ipairs(items) do
+    if item.name == "chat 1" then
+      on_choice(item, i)
+      return
+    end
+  end
+  on_choice(nil, nil)
+end
+ndsh.sessions()
+check("navigator swaps back to chat 1", vim.fn.bufwinid(chat_buf) ~= -1)
+check("chat 1 transcript survived the swap", chat_text():find("integration hello", 1, true) ~= nil)
+
+-- 7. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()
 local stopped = vim.wait(5000, function()
-  return has_status(input_win, "stopped")
+  local win = vim.fn.bufwinid(input1_buf)
+  return win ~= -1 and has_status(win, "stopped")
 end, 50)
 check("stop is quiet and shows stopped", stopped)
 

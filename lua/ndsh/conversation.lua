@@ -49,7 +49,6 @@ function M.new(cfg, spec, hooks)
     chat_win = nil, ---@type integer|nil
     input_win = nil, ---@type integer|nil
     takeover = false,
-    full_tab = false,
     closing = false, -- guard: our own hides must not retrigger panel teardown
     prev_buf = nil, ---@type integer|nil
     prev_contentful = false,
@@ -174,15 +173,11 @@ function M:watch_windows()
   })
 end
 
----@param opts { full: boolean|nil }|nil full: open as a full tabpage panel.
-function M:open(opts)
-  opts = opts or {}
+---Open the panel windows in the current tab (docked or takeover layout).
+function M:open()
   self:ensure_buffers()
   if self:is_open() then
-    if opts.full then
-      -- Already open: jump to the panel's tabpage instead of rebuilding.
-      vim.api.nvim_set_current_tabpage(vim.api.nvim_win_get_tabpage(self.chat_win))
-    elseif vim.api.nvim_win_get_tabpage(self.chat_win) ~= vim.api.nvim_get_current_tabpage() then
+    if vim.api.nvim_win_get_tabpage(self.chat_win) ~= vim.api.nvim_get_current_tabpage() then
       -- Open in another tab: move the panel here instead of duplicating it.
       hide_guarded(self, { chat = self.chat_win, input = self.input_win })
     else
@@ -190,25 +185,7 @@ function M:open(opts)
     end
   end
   if not self:is_open() then
-    local wins
-    if opts.full then
-      -- Full mode always gets a dedicated tabpage so tab switching between
-      -- code and panel is always available; closing tabs back out. tabnew's
-      -- fresh listed scratch is deleted so it cannot leak into buffer
-      -- lists (barbar would show it as "buffer N").
-      vim.cmd("tabnew")
-      local tab_scratch = vim.api.nvim_get_current_buf()
-      wins = layout.show(self.cfg, self.chat_buf, self.input_buf)
-      self.full_tab = wins.takeover
-      if tab_scratch ~= self.chat_buf and tab_scratch ~= self.input_buf
-        and vim.api.nvim_buf_is_valid(tab_scratch)
-      then
-        pcall(vim.api.nvim_buf_delete, tab_scratch, { force = true })
-      end
-    else
-      wins = layout.show(self.cfg, self.chat_buf, self.input_buf)
-      self.full_tab = false
-    end
+    local wins = layout.show(self.cfg, self.chat_buf, self.input_buf)
     self.chat_win = wins.chat
     self.input_win = wins.input
     self.takeover = wins.takeover
@@ -221,12 +198,26 @@ function M:open(opts)
   self:mark_read()
 end
 
+---Hide the panel windows, keeping buffers and registration. Unlike
+---close(), no restore semantics: used when swapping visible conversations.
+function M:hide()
+  if not self:is_open() then
+    return
+  end
+  hide_guarded(self, { chat = self.chat_win, input = self.input_win })
+  self.chat_win = nil
+  self.input_win = nil
+  self.takeover = false
+  self.prev_buf = nil
+  self.prev_contentful = false
+end
+
 function M:close()
   local chat_valid = self.chat_win ~= nil and vim.api.nvim_win_is_valid(self.chat_win)
   local input_valid = self.input_win ~= nil and vim.api.nvim_win_is_valid(self.input_win)
   if not chat_valid and not input_valid then
     self.chat_win, self.input_win = nil, nil
-    self.takeover, self.full_tab = false, false
+    self.takeover = false
     self.prev_buf, self.prev_contentful = nil, false
     return
   end
@@ -239,20 +230,13 @@ function M:close()
     end
   end
   self.closing = true
-  local survivor = nil
-  if self.full_tab then
-    -- Closing the tabpage closes both panel windows with it.
-    pcall(vim.cmd, "tabclose")
-  else
-    survivor = layout.hide({
-      chat = chat_valid and self.chat_win or nil,
-      input = input_valid and self.input_win or nil,
-    })
-  end
+  local survivor = layout.hide({
+    chat = chat_valid and self.chat_win or nil,
+    input = input_valid and self.input_win or nil,
+  })
   self.chat_win = nil
   self.input_win = nil
   self.takeover = false
-  self.full_tab = false
   if survivor and vim.api.nvim_win_is_valid(survivor) then
     self.hooks.restore(survivor, self.prev_contentful and self.prev_buf or nil)
   end

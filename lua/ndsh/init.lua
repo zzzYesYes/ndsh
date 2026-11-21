@@ -73,6 +73,18 @@ local function new_conversation(name)
   return conv
 end
 
+---Show a conversation in the single panel, swapping out the visible one.
+---@param conv table
+local function show_conversation(conv)
+  if state.active and state.active ~= conv and state.active:is_open() then
+    state.active:hide()
+  end
+  state.active = conv
+  touch(conv)
+  conv:open()
+  M._ensure_runtime()
+end
+
 ---@return table conv the active conversation, creating the first on demand
 local function active_conversation()
   if not state.active then
@@ -101,7 +113,6 @@ function M.setup(opts)
     end
   end
   map(state.cfg.keys.toggle, M.toggle, "Toggle ndsh panel")
-  map(state.cfg.keys.toggle_full, M.toggle_full, "Toggle ndsh panel (full screen)")
   map(state.cfg.keys.sessions, M.sessions, "Navigate ndsh sessions")
   map(state.cfg.keys.new_session, function()
     M.new_session()
@@ -126,13 +137,9 @@ function M.is_open()
   return state.active ~= nil and state.active:is_open()
 end
 
----@param opts { full: boolean|nil }|nil
-function M.open(opts)
+function M.open()
   ensure_setup()
-  local conv = active_conversation()
-  conv:open(opts)
-  touch(conv)
-  M._ensure_runtime()
+  show_conversation(active_conversation())
 end
 
 function M.close()
@@ -149,57 +156,29 @@ function M.toggle()
   end
 end
 
----Toggle the full-screen panel: closes it when pressed inside its tab,
----converts a docked panel to full-screen, otherwise opens it or jumps to it.
-function M.toggle_full()
-  local conv = active_conversation()
-  if not conv:is_open() then
-    M.open({ full = true })
-    return
-  end
-  local in_panel_tab = vim.api.nvim_win_get_tabpage(conv.chat_win) == vim.api.nvim_get_current_tabpage()
-  if conv.full_tab and in_panel_tab then
-    conv:close()
-  elseif not conv.full_tab and not conv.takeover then
-    -- Docked panel: rebuild as a dedicated full tab.
-    conv:close()
-    conv:open({ full = true })
-    M._ensure_runtime()
-  else
-    -- Takeover panel is already full-screen: just focus it.
-    conv:open({ full = true })
-  end
-end
-
 function M.focus_input()
   if state.active then
     state.active:focus_input()
   end
 end
 
----Create a conversation in a new full-tab panel (:NDSHNew).
+---Create a conversation and show it in the panel (:NDSHNew).
 ---@param name string|nil
 function M.new_session(name)
   ensure_setup()
   local conv = new_conversation(name)
-  state.active = conv
-  conv:open({ full = true })
-  M._ensure_runtime()
+  show_conversation(conv)
   return conv
 end
 
----Jump to a conversation's tab, opening its panel when detached.
+---Jump to a conversation in the panel (:NDSHSessions selection).
 ---@param conv table
 local function goto_conversation(conv)
-  state.active = conv
-  touch(conv)
-  if not conv:is_open() then
-    conv:open({ full = true })
-    M._ensure_runtime()
-  else
-    vim.api.nvim_set_current_tabpage(vim.api.nvim_win_get_tabpage(conv.chat_win))
-  end
+  show_conversation(conv)
   conv:mark_read()
+  if conv:is_open() then
+    vim.fn.win_gotoid(conv.chat_win)
+  end
 end
 
 ---Session navigator (:NDSHSessions), most recently active first.
@@ -209,11 +188,15 @@ function M.sessions()
     vim.notify("ndsh: no sessions yet; :NDSHNew to create one", vim.log.levels.INFO)
     return
   end
-  local ordered = vim.deepcopy(state.conversations)
+  -- Shallow copy for sorting: deepcopied conversations would be distinct
+  -- objects and opening one would detach it from the registry.
+  local ordered = {}
+  for i, conv in ipairs(state.conversations) do
+    ordered[i] = conv
+  end
   table.sort(ordered, function(a, b)
     return (state.activity[a.id] or 0) > (state.activity[b.id] or 0)
   end)
-  -- Current session sinks to the bottom so alternating two is natural.
   sessions_ui.open(ordered, goto_conversation)
 end
 

@@ -152,38 +152,7 @@ check(
   vim.api.nvim_win_get_buf(wins[1]) == dash
 )
 
--- 7. Explicit full mode always opens a dedicated tab, even from a
--- dashboard-style single window, so gt/gT always has somewhere to go.
-vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
-local tabs_before = #vim.api.nvim_list_tabpages()
-ndsh.open({ full = true })
-wins = vim.api.nvim_tabpage_list_wins(0)
-check("full: panel is a full tab (2 windows)", #wins == 2)
-check("full: opened a new tabpage", #vim.api.nvim_list_tabpages() == tabs_before + 1)
-ndsh.close()
-check(
-  "full close: tabpage restored",
-  #vim.api.nvim_list_tabpages() == tabs_before and #vim.api.nvim_tabpage_list_wins(0) == 1
-)
-vim.cmd("enew")
-vim.api.nvim_set_option_value("buftype", "nofile", { buf = 0 })
-tabs_before = #vim.api.nvim_list_tabpages()
-ndsh.open({ full = true })
-check("full from dashboard: still a dedicated tab", #vim.api.nvim_list_tabpages() == tabs_before + 1)
-ndsh.close()
-check("full from dashboard close: tab restored", #vim.api.nvim_list_tabpages() == tabs_before)
-
--- 7b. toggle_full: docked converts to full; pressed inside the full tab it
--- closes back out.
-vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
-ndsh.open()
-check("toggle_full setup: docked 3 windows", #vim.api.nvim_tabpage_list_wins(0) == 3)
-ndsh.toggle_full()
-check("toggle_full: docked converts to full tab", #vim.api.nvim_list_tabpages() == 2 and #vim.api.nvim_tabpage_list_wins(0) == 2)
-ndsh.toggle_full()
-check("toggle_full: pressed inside closes back out", #vim.api.nvim_list_tabpages() == 1)
-
--- 8. Closing one panel window by hand tears the whole panel down.
+-- 7. Closing one panel window by hand tears the whole panel down.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
 ndsh.open()
 local chat_win = vim.fn.bufwinid(chat_buf)
