@@ -205,6 +205,7 @@ check("final close: back to code window", #vim.api.nvim_tabpage_list_wins(0) == 
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
 ndsh.open()
 local foreign = vim.api.nvim_create_buf(true, false)
+vim.api.nvim_buf_set_name(foreign, vim.fn.tempname() .. "-foreign.txt")
 local chat_win9 = vim.fn.bufwinid(chat_buf)
 local tabs_before_relocate = #vim.api.nvim_list_tabpages()
 vim.api.nvim_win_set_buf(chat_win9, foreign)
@@ -218,6 +219,14 @@ check(
   "relocated tab shows the foreign buffer",
   vim.api.nvim_win_get_buf(vim.api.nvim_tabpage_list_wins(vim.api.nvim_list_tabpages()[#vim.api.nvim_list_tabpages()])[1]) == foreign
 )
+-- tabnew's listed scratch must not leak into buffer lists.
+local stray = 0
+for _, b in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.bo[b].buflisted and vim.api.nvim_buf_get_name(b) == "" then
+    stray = stray + 1
+  end
+end
+check("no stray listed scratch buffer", stray == 0)
 vim.cmd("tabclose")
 
 -- 10. Deleting a panel buffer tears the panel down; reopen rebuilds it.

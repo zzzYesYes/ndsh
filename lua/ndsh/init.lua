@@ -139,10 +139,14 @@ local function guard_panel_buffers()
   for _, buf in ipairs(relocated) do
     if vim.api.nvim_buf_is_valid(buf) then
       -- Third-party autocmds fire when the buffer enters the new tab's
-      -- window; their errors must not abort the relocation loop.
+      -- window; their errors must not abort the relocation loop. tabnew's
+      -- fresh listed scratch buffer is deleted so it cannot leak into
+      -- buffer lists (barbar would show it as "buffer N").
       local ok = pcall(function()
         vim.cmd("tabnew")
+        local scratch = vim.api.nvim_get_current_buf()
         vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
+        vim.api.nvim_buf_delete(scratch, { force = true })
       end)
       if ok then
         vim.notify("ndsh: opened in a new tab (panel windows are reserved)", vim.log.levels.INFO)
@@ -207,10 +211,18 @@ function M.open(opts)
     local wins
     if opts.full then
       -- Full mode always gets a dedicated tabpage so tab switching between
-      -- code and panel is always available; closing tabs back out.
+      -- code and panel is always available; closing tabs back out. tabnew's
+      -- fresh listed scratch is deleted so it cannot leak into buffer
+      -- lists (barbar would show it as "buffer N").
       vim.cmd("tabnew")
+      local tab_scratch = vim.api.nvim_get_current_buf()
       wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
       state.full_tab = wins.takeover
+      if tab_scratch ~= state.chat_buf and tab_scratch ~= state.input_buf
+        and vim.api.nvim_buf_is_valid(tab_scratch)
+      then
+        pcall(vim.api.nvim_buf_delete, tab_scratch, { force = true })
+      end
     else
       wins = layout.show(state.cfg, state.chat_buf, state.input_buf)
       state.full_tab = false
