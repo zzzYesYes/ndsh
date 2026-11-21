@@ -12,7 +12,7 @@ end
 
 local function find_chat_buf()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "markdown" then
+    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "ndsh" then
       return buf
     end
   end
@@ -30,7 +30,7 @@ check("takeover: panel is 2 windows", #wins == 2)
 check("takeover: panel is open", ndsh.is_open())
 
 local chat_buf = find_chat_buf()
-check("chat buffer exists with markdown filetype", chat_buf ~= nil)
+check("chat buffer exists with ndsh filetype", chat_buf ~= nil)
 
 local input_buf
 for _, win in ipairs(wins) do

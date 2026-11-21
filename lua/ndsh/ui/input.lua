@@ -26,6 +26,8 @@ function M.create(cfg, on_send)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
   vim.api.nvim_set_option_value("bufhidden", "hide", { buf = buf })
   vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
+  -- Own filetype so statusline plugins can be disabled for panel windows.
+  vim.api.nvim_set_option_value("filetype", "ndshinput", { buf = buf })
 
   local function send()
     local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)

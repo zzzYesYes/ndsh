@@ -336,25 +336,20 @@ local CONN_LABEL = {
 }
 
 ---Refresh both panel winbars from current state:
---- chat  — active model and session working directory
---- input — connection/agent status and context usage
+--- chat  — model left; working directory and context usage right
+--- input — connection/agent status
 --- Winbar, not statusline: statusline plugins (lualine & co.) own and
 --- overwrite 'statusline' per window; winbar is untouched by them.
 refresh_chrome = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
     local model = state.route and state.route.model or state.cfg.dsh.model
     local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
-    vim.api.nvim_set_option_value(
-      "winbar",
-      (" %s%s%s"):format(model, cwd ~= "" and " · " or "", cwd),
-      { win = state.chat_win }
-    )
-  end
-  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
-    local label = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
-    local ctx = ""
+    local right_parts = {}
+    if cwd ~= "" then
+      right_parts[#right_parts + 1] = cwd
+    end
     if state.context.used then
-      ctx = " · " .. fmt_tokens(state.context.used)
+      local ctx = fmt_tokens(state.context.used)
       if state.context.window then
         -- winbar is statusline syntax: a literal % must be doubled.
         ctx = ctx .. ("/%s · %d%%%%"):format(
@@ -362,8 +357,18 @@ refresh_chrome = function()
           math.floor(state.context.used / state.context.window * 100 + 0.5)
         )
       end
+      right_parts[#right_parts + 1] = ctx
     end
-    input.set_status(state.input_win, label .. ctx)
+    local right = table.concat(right_parts, " · ")
+    vim.api.nvim_set_option_value(
+      "winbar",
+      " " .. model .. (right ~= "" and "%= " .. right .. " " or ""),
+      { win = state.chat_win }
+    )
+  end
+  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
+    local label = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
+    input.set_status(state.input_win, label)
   end
 end
 

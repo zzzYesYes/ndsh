@@ -24,7 +24,7 @@ end
 
 local function find_chat_buf()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "markdown" then
+    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "ndsh" then
       return buf
     end
   end
@@ -79,15 +79,15 @@ check("user message rendered", chat_text():find("❯ You", 1, true) ~= nil)
 check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo hi\"%}") ~= nil)
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
--- Chrome: chat winbar shows model and cwd, input winbar shows context usage.
+-- Chrome: chat winbar shows model left, cwd and context usage right.
 local chat_winbar = winbar_text(vim.fn.bufwinid(chat_buf))
 check(
   "chat winbar shows model and cwd",
   chat_winbar:find("fake%-v1") ~= nil and chat_winbar:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
 )
 check(
-  "input winbar shows context usage",
-  winbar_text(input_win):find("12k/128k · 10%%%%") ~= nil
+  "chat winbar shows context usage right-aligned",
+  chat_winbar:find("%= .*12k/128k · 10%%%%") ~= nil
 )
 
 local back_idle = vim.wait(5000, function()

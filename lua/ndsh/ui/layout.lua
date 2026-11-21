@@ -43,6 +43,9 @@ local function set_chat_win_options(win)
     foldenable = true,
     conceallevel = 2,
     winfixwidth = false,
+    -- Blank, not default: stops the "[No Name][-]" default render. lualine
+    -- is disabled for the panel filetypes so it stays ours.
+    statusline = " ",
   }
   for k, v in pairs(opts) do
     vim.api.nvim_set_option_value(k, v, { win = win })
@@ -51,6 +54,7 @@ end
 
 local function set_input_win_options(win, cfg)
   vim.api.nvim_set_option_value("winfixheight", true, { win = win })
+  vim.api.nvim_set_option_value("statusline", " ", { win = win })
   vim.api.nvim_win_set_height(win, cfg.input_height)
 end
 

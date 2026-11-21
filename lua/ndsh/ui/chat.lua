@@ -90,7 +90,10 @@ function M.create(keys)
   vim.api.nvim_set_option_value("bufhidden", "hide", { buf = buf })
   vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
   vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
-  vim.api.nvim_set_option_value("filetype", "markdown", { buf = buf })
+  -- Own filetype so statusline plugins can be disabled for panel windows;
+  -- markdown treesitter highlighting is attached explicitly (soft dep).
+  vim.api.nvim_set_option_value("filetype", "ndsh", { buf = buf })
+  pcall(vim.treesitter.start, buf, "markdown")
   states[buf] = { empty = true, msg_open = false, tools = {} }
 
   vim.keymap.set("n", "q", function()
