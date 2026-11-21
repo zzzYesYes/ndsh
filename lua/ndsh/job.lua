@@ -25,7 +25,7 @@ end
 
 ---Spawn the runtime process.
 ---@param cmd string[] argv
----@param opts { on_frame: fun(line: string), on_stderr: fun(line: string)|nil, on_exit: fun(code: integer)|nil }
+---@param opts { on_frame: fun(line: string), on_stderr: fun(line: string)|nil, on_exit: fun(code: integer)|nil, env: table<string, string>|nil }
 ---@return NdsJob
 function M.spawn(cmd, opts)
   local self = setmetatable({ cmd = cmd }, M)
@@ -33,6 +33,7 @@ function M.spawn(cmd, opts)
   local job_id = vim.fn.jobstart(cmd, {
     stdin = "pipe",
     stdout_buffered = false,
+    env = opts.env,
     on_stdout = function(_, data)
       feed(data)
     end,

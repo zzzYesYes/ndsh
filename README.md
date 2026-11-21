@@ -31,6 +31,7 @@ set runtimepath+=~/workspace/ndsh
 | `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>aO`) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
+| `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
 | `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 
@@ -56,9 +57,12 @@ The runtime connects when the panel opens (`dsh.auto_connect`). `dsh.cmd`
 sets the argv explicitly; otherwise an installed `dsh` is used, falling back
 to a `~/workspace/deepseek-harness` source checkout via pnpm. Provider and
 model default to `deepseek-official` / `deepseek-v4-flash` and are
-configurable. The runtime needs its provider credentials (e.g.
-`DEEPSEEK_API_KEY` or `deepseek-harness/.env`) in the environment Neovim was
-launched from.
+configurable. Credentials: run `:NDSHConnect` to pick a provider, enter its
+API key and model — they are stored owner-only at
+`stdpath("data")/ndsh/credentials.json` and injected into the runtime's
+environment at spawn (like `opencode auth login`). Environment variables
+already present when Neovim launches (e.g. `DEEPSEEK_API_KEY`) also work
+without connecting.
 
 ## Test
 

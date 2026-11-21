@@ -129,6 +129,23 @@ do
   check("tool call summary is one line", call[1].summary == '{ "command": "ls" }')
 end
 
+-- Credential store roundtrip and file permissions.
+do
+  local credentials = require("ndsh.credentials")
+  local path = vim.fn.tempname() .. "/credentials.json"
+  credentials.set("deepseek-official", { env = { DEEPSEEK_API_KEY = "sk-test" }, model = "deepseek-v4-flash" }, path)
+  credentials.set("anthropic", { env = { ANTHROPIC_API_KEY = "sk-ant" }, model = "claude-sonnet-4-5" }, path)
+  local entry = credentials.get("deepseek-official", path)
+  check("credentials roundtrip", entry ~= nil and entry.env.DEEPSEEK_API_KEY == "sk-test" and entry.model == "deepseek-v4-flash")
+  check(
+    "credentials env_for",
+    credentials.env_for("anthropic", path).ANTHROPIC_API_KEY == "sk-ant" and next(credentials.env_for("unknown", path)) == nil
+  )
+  local perms = vim.fn.getfperm(path)
+  check("credentials file is owner-only", perms == "rw-------")
+  vim.fn.delete(vim.fn.fnamemodify(path, ":h"), "rf")
+end
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

@@ -357,6 +357,53 @@ function M.restart_session()
   end
 end
 
+---Interactive provider connection (:NDSHConnect): pick a provider, enter
+---its credentials and model, persist them, then restart the runtime.
+function M.connect()
+  ensure_setup()
+  local providers = state.cfg.providers
+  vim.ui.select(providers, {
+    prompt = "ndsh: connect provider",
+    format_item = function(item)
+      return item.label
+    end,
+  }, function(provider)
+    if not provider then
+      return
+    end
+    local env = {}
+    local function ask_model()
+      vim.ui.input({ prompt = "Model: ", default = provider.default_model or "" }, function(model)
+        if not model or model == "" then
+          return
+        end
+        require("ndsh.credentials").set(provider.id, { env = env, model = model })
+        state.cfg.dsh.provider = provider.id
+        state.cfg.dsh.model = model
+        M.restart_session()
+        vim.notify(("ndsh: connected %s (%s)"):format(provider.label, model), vim.log.levels.INFO)
+      end)
+    end
+    local function ask_key(i)
+      if i > #provider.env then
+        ask_model()
+        return
+      end
+      local name = provider.env[i]
+      vim.ui.input({ prompt = ("API key (%s), empty to skip: "):format(name) }, function(secret)
+        if secret == nil then
+          return -- aborted: leave the store and runtime untouched
+        end
+        if secret ~= "" then
+          env[name] = secret
+        end
+        ask_key(i + 1)
+      end)
+    end
+    ask_key(1)
+  end)
+end
+
 ---Show the runtime's captured stderr log in a scratch split.
 function M.show_logs()
   local lines = state.session and state.session:logs() or {}

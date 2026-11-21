@@ -30,3 +30,7 @@ end, { desc = "Restart the ndsh runtime" })
 vim.api.nvim_create_user_command("NDSHLog", function()
   require("ndsh").show_logs()
 end, { desc = "Show the ndsh runtime log" })
+
+vim.api.nvim_create_user_command("NDSHConnect", function()
+  require("ndsh").connect()
+end, { desc = "Connect a model provider" })

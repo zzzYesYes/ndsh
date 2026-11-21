@@ -48,6 +48,16 @@ M.defaults = {
     approval = true,
     --- Receive user-question/ask server prompts.
     user_questions = true,
+    --- Extra environment for the runtime process; stored credentials for
+    --- the active provider merge on top at spawn time.
+    env = {}, ---@type table<string, string>
+  },
+  --- Providers offered by :NDSHConnect. `env` lists the variables the
+  --- provider authenticates with; `default_model` prefill the model prompt.
+  providers = {
+    { id = "deepseek-official", label = "DeepSeek (official)", env = { "DEEPSEEK_API_KEY" }, default_model = "deepseek-v4-flash" },
+    { id = "anthropic", label = "Anthropic", env = { "ANTHROPIC_API_KEY" }, default_model = "claude-sonnet-4-5" },
+    { id = "openai", label = "OpenAI", env = { "OPENAI_API_KEY" }, default_model = "gpt-5" },
   },
 }
 
