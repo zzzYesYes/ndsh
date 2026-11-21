@@ -115,6 +115,31 @@ function M.open(opts)
   watch_windows()
 end
 
+---Try to show a dashboard in the surviving window after a takeover closes.
+---Falls back silently to the scratch buffer already in place.
+---@param win integer
+local function restore_dashboard(win)
+  local ok, dash = pcall(require, "config.dashboard")
+  if ok and type(dash.open) == "function" then
+    if pcall(vim.api.nvim_win_call, win, dash.open) then
+      return
+    end
+  end
+  for _, cmd in ipairs({ "Dashboard", "Alpha" }) do
+    if vim.fn.exists(":" .. cmd) == 2 then
+      if pcall(vim.api.nvim_win_call, win, function()
+        vim.cmd(cmd)
+      end) then
+        return
+      end
+    end
+  end
+  local ok_snacks, snacks = pcall(require, "snacks")
+  if ok_snacks and snacks.dashboard and type(snacks.dashboard.open) == "function" then
+    pcall(snacks.dashboard.open)
+  end
+end
+
 function M.close()
   local chat_valid = state.chat_win ~= nil and vim.api.nvim_win_is_valid(state.chat_win)
   local input_valid = state.input_win ~= nil and vim.api.nvim_win_is_valid(state.input_win)
@@ -124,20 +149,28 @@ function M.close()
     return
   end
   state.closing = true
+  local survivor = nil
   if state.full_tab then
     -- Closing the tabpage closes both panel windows with it.
     pcall(vim.cmd, "tabclose")
   else
-    layout.hide({
+    survivor = layout.hide({
       chat = chat_valid and state.chat_win or nil,
       input = input_valid and state.input_win or nil,
-      takeover = state.takeover,
     })
   end
   state.chat_win = nil
   state.input_win = nil
   state.takeover = false
   state.full_tab = false
+  if survivor and vim.api.nvim_win_is_valid(survivor) then
+    local restore = state.cfg.restore
+    if type(restore) == "function" then
+      pcall(restore, survivor)
+    elseif restore == "dashboard" then
+      restore_dashboard(survivor)
+    end
+  end
   -- WinClosed handlers are scheduled, so the guard lifts after they run.
   vim.schedule(function()
     state.closing = false

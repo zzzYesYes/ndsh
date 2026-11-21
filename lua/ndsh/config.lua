@@ -19,6 +19,10 @@ M.defaults = {
     --- Global toggle mapping in normal mode; nil to define your own.
     toggle = "<leader>ao",
   },
+  --- What fills the surviving window when a full-tab takeover closes:
+  --- "dashboard" (try config.dashboard, :Dashboard, :Alpha, snacks.dashboard),
+  --- "scratch" (empty buffer), or fun(win: integer) for a custom restore.
+  restore = "dashboard",
 }
 
 local function is_list(v)
@@ -39,6 +43,12 @@ function M.resolve(opts)
   assert(type(cfg.height) == "number" and cfg.height > 0 and cfg.height < 1, "ndsh: height must be in (0, 1)")
   assert(type(cfg.input_height) == "number" and cfg.input_height >= 1, "ndsh: input_height must be >= 1")
   assert(is_list(cfg.keys.send), "ndsh: keys.send must be a list of key strings")
+  assert(
+    cfg.restore == "dashboard"
+      or cfg.restore == "scratch"
+      or type(cfg.restore) == "function",
+    "ndsh: restore must be 'dashboard', 'scratch' or a function"
+  )
   return cfg
 end
 

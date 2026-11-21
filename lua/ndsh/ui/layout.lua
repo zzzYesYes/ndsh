@@ -140,21 +140,39 @@ function M.show(cfg, chat_buf, input_buf)
   return { chat = chat_win, input = input_win, takeover = takeover }
 end
 
----Hide the panel windows. In takeover mode the chat window is the tab's last
----window and cannot be hidden, so it is restored to an empty scratch buffer.
----@param wins { chat: integer|nil, input: integer|nil, takeover: boolean|nil }
-function M.hide(wins)
-  if wins.input and vim.api.nvim_win_is_valid(wins.input) then
-    vim.api.nvim_win_hide(wins.input)
+---Hide one window, or replace its buffer with an empty scratch when it is
+---the tab's last window (which cannot be hidden).
+---@param win integer
+local function hide_or_scratch(win)
+  local tab = vim.api.nvim_win_get_tabpage(win)
+  if #vim.api.nvim_tabpage_list_wins(tab) == 1 then
+    local scratch = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(win, scratch)
+  else
+    vim.api.nvim_win_hide(win)
   end
-  if wins.chat and vim.api.nvim_win_is_valid(wins.chat) then
-    if wins.takeover then
-      local scratch = vim.api.nvim_create_buf(false, true)
-      vim.api.nvim_win_set_buf(wins.chat, scratch)
-    else
-      vim.api.nvim_win_hide(wins.chat)
+end
+
+---Hide the panel windows. When a window survives as the tab's last window
+---it shows an empty scratch buffer; that survivor is returned so the caller
+---can run a restore hook (e.g. show a dashboard) in it.
+---@param wins { chat: integer|nil, input: integer|nil }
+---@return integer|nil survivor window left showing a scratch buffer
+function M.hide(wins)
+  local survivor = nil
+  if wins.input and vim.api.nvim_win_is_valid(wins.input) then
+    hide_or_scratch(wins.input)
+    if vim.api.nvim_win_is_valid(wins.input) then
+      survivor = wins.input
     end
   end
+  if wins.chat and vim.api.nvim_win_is_valid(wins.chat) then
+    hide_or_scratch(wins.chat)
+    if vim.api.nvim_win_is_valid(wins.chat) then
+      survivor = wins.chat
+    end
+  end
+  return survivor
 end
 
 return M

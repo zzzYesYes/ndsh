@@ -82,7 +82,8 @@ local fold_ok = vim.api.nvim_win_call(chat_win, function()
 end)
 check("tool result folded closed", fold_ok)
 
--- 4. Close in takeover mode restores a single empty window.
+-- 4. Close in takeover mode restores a single empty window (no dashboard
+-- provider exists under -u NONE, so the scratch fallback shows).
 ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)
 check("takeover close: back to 1 window", #wins == 1)
@@ -91,6 +92,23 @@ check(
   "takeover close: remaining window is empty scratch",
   vim.api.nvim_buf_get_name(only_buf) == ""
 )
+
+-- 4b. A custom restore hook runs in the surviving window.
+ndsh.setup({
+  restore = function(win)
+    vim.api.nvim_buf_set_name(vim.api.nvim_win_get_buf(win), "restored-marker")
+  end,
+})
+ndsh.open()
+ndsh.close()
+wins = vim.api.nvim_tabpage_list_wins(0)
+check("restore hook: single window survives", #wins == 1)
+check(
+  "restore hook: ran in surviving window",
+  vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(wins[1])):find("restored%-marker$") ~= nil
+)
+vim.cmd("bwipeout!")
+ndsh.setup({})
 
 -- 5. With a code buffer up, the panel docks right (3 windows) instead.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
