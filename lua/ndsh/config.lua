@@ -17,7 +17,7 @@ M.defaults = {
     --- <CR> also sends; insert-mode <CR> is always a plain newline.
     send = { "<C-s>" },
     --- Global toggle mapping in normal mode; nil to define your own.
-    toggle = "<leader>anr",
+    toggle = "<leader>ant",
     --- Session navigator and new-session mappings; nil to define your own.
     sessions = "<leader>ans",
     new_session = "<leader>ann",

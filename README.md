@@ -27,7 +27,7 @@ set runtimepath+=~/workspace/ndsh
 
 | Command | Action |
 |---|---|
-| `:NDSHToggle` | Toggle the panel (default map: `<leader>anr`) |
+| `:NDSHToggle` | Toggle the panel (default map: `<leader>ant`) |
 | `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
 | `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
