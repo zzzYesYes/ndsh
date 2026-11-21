@@ -335,16 +335,20 @@ local CONN_LABEL = {
   stopped = "stopped",
 }
 
----Refresh both panel winbars from current state:
---- chat  — model left; working directory and context usage right
---- input — connection/agent status
+---Refresh the panel winbar from current state. Everything lives on the
+--- chat (input) pane: model and agent status left; working directory and
+--- context usage right. The message pane carries no winbar.
 --- Winbar, not statusline: statusline plugins (lualine & co.) own and
 --- overwrite 'statusline' per window; winbar is untouched by them.
 refresh_chrome = function()
   if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
+    vim.api.nvim_set_option_value("winbar", "", { win = state.chat_win })
+  end
+  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
     local model = state.route and state.route.model or state.cfg.dsh.model
-    local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
+    local status = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
     local right_parts = {}
+    local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
     if cwd ~= "" then
       right_parts[#right_parts + 1] = cwd
     end
@@ -360,15 +364,10 @@ refresh_chrome = function()
       right_parts[#right_parts + 1] = ctx
     end
     local right = table.concat(right_parts, " · ")
-    vim.api.nvim_set_option_value(
-      "winbar",
-      " " .. model .. (right ~= "" and "%= " .. right .. " " or ""),
-      { win = state.chat_win }
+    input.set_status(
+      state.input_win,
+      ("%s · %s%s"):format(status, model, right ~= "" and "%= " .. right .. " " or "")
     )
-  end
-  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
-    local label = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
-    input.set_status(state.input_win, label)
   end
 end
 

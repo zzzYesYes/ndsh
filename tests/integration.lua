@@ -79,15 +79,17 @@ check("user message rendered", chat_text():find("❯ You", 1, true) ~= nil)
 check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo hi\"%}") ~= nil)
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
--- Chrome: chat winbar shows model left, cwd and context usage right.
-local chat_winbar = winbar_text(vim.fn.bufwinid(chat_buf))
+-- Chrome: everything on the chat (input) pane winbar — model left, cwd
+-- and context usage right; the message pane carries no winbar.
+check("message pane has no winbar", winbar_text(vim.fn.bufwinid(chat_buf)) == "")
+local input_winbar = winbar_text(input_win)
 check(
   "chat winbar shows model and cwd",
-  chat_winbar:find("fake%-v1") ~= nil and chat_winbar:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
+  input_winbar:find("fake%-v1") ~= nil and input_winbar:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
 )
 check(
   "chat winbar shows context usage right-aligned",
-  chat_winbar:find("%= .*12k/128k · 10%%%%") ~= nil
+  input_winbar:find("%= .*12k/128k · 10%%%%") ~= nil
 )
 
 local back_idle = vim.wait(5000, function()
