@@ -2,12 +2,12 @@
 
 Neovim chat UI for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh).
 
-`ndsh` is a Lua plugin that will spawn `dsh --profile sdk` and drive it over the
-SDK's newline-delimited JSON-RPC protocol, rendering the session in native
-Neovim buffers.
+`ndsh` spawns `dsh --profile sdk` and drives it over the SDK's
+newline-delimited JSON-RPC protocol, rendering the session in native Neovim
+buffers. Approvals and user questions are answered through `vim.ui`.
 
-Status: milestone 1 (UI frame) done — panel layout, rendering pipeline, and a
-scripted demo. The SDK job/protocol layer is milestone 2.
+Status: milestone 2 done — panel frame plus a live SDK backend verified
+against a scripted fixture runtime and a real `dsh` process.
 
 ## Install (development)
 
@@ -28,8 +28,10 @@ set runtimepath+=~/workspace/ndsh
 | Command | Action |
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ao`) |
-| `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHOpen!` | Open as a full-screen tab (default map: `<leader>aO`) |
+| `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
+| `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
+| `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 
 Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
@@ -48,8 +50,20 @@ plain newline in insert mode and sends in normal mode. If your global "tab"
 keys operate on buffers (e.g. barbar), set `keys.tabnext`/`keys.tabprev` so
 they switch real tabpages inside the panel.
 
+## Runtime connection
+
+The runtime connects when the panel opens (`dsh.auto_connect`). `dsh.cmd`
+sets the argv explicitly; otherwise an installed `dsh` is used, falling back
+to a `~/workspace/deepseek-harness` source checkout via pnpm. Provider and
+model default to `deepseek-official` / `deepseek-v4-flash` and are
+configurable. The runtime needs its provider credentials (e.g.
+`DEEPSEEK_API_KEY` or `deepseek-harness/.env`) in the environment Neovim was
+launched from.
+
 ## Test
 
 ```sh
-nvim --headless -u NONE --cmd "set rtp+=." -l tests/smoke.lua
+nvim --headless -u NONE --cmd "set rtp+=." -l tests/unit.lua        # protocol/framing units
+nvim --headless -u NONE --cmd "set rtp+=." -l tests/smoke.lua       # UI frame
+nvim --headless -u NONE --cmd "set rtp+=." -l tests/integration.lua # full stack vs tests/fixtures/fake_dsh.py
 ```
