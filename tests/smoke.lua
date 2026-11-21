@@ -200,16 +200,25 @@ check("reopen after manual close: clean 3 windows", #vim.api.nvim_tabpage_list_w
 ndsh.close()
 check("final close: back to code window", #vim.api.nvim_tabpage_list_wins(0) == wins_after)
 
--- 9. Buffer navigation inside a panel window snaps the panel buffer back.
+-- 9. A file opened into a panel window is relocated to a new tabpage; the
+-- panel keeps its buffers.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
 ndsh.open()
 local foreign = vim.api.nvim_create_buf(true, false)
 local chat_win9 = vim.fn.bufwinid(chat_buf)
+local tabs_before_relocate = #vim.api.nvim_list_tabpages()
 vim.api.nvim_win_set_buf(chat_win9, foreign)
 vim.wait(200, function()
   return vim.api.nvim_win_get_buf(chat_win9) == chat_buf
+    and #vim.api.nvim_list_tabpages() == tabs_before_relocate + 1
 end)
-check("panel window snaps its buffer back", vim.api.nvim_win_get_buf(chat_win9) == chat_buf)
+check("panel window keeps its buffer", vim.api.nvim_win_get_buf(chat_win9) == chat_buf)
+check("foreign buffer relocated to a new tab", #vim.api.nvim_list_tabpages() == tabs_before_relocate + 1)
+check(
+  "relocated tab shows the foreign buffer",
+  vim.api.nvim_win_get_buf(vim.api.nvim_tabpage_list_wins(vim.api.nvim_list_tabpages()[#vim.api.nvim_list_tabpages()])[1]) == foreign
+)
+vim.cmd("tabclose")
 
 -- 10. Deleting a panel buffer tears the panel down; reopen rebuilds it.
 vim.api.nvim_buf_delete(input_buf, { force = true })

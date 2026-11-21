@@ -107,10 +107,11 @@ local function hide_guarded(wins)
   end)
 end
 
----Panel windows are reserved: buffer navigation inside them (barbar's
----:BufferNext et al. operates on the current window) must not replace their
----buffers. Snap replaced buffers back; a deleted panel buffer tears the
----panel down and it is rebuilt on the next open.
+---Panel windows are reserved: opening a file while focused in one (e.g. a
+---picker's :edit) must not displace the panel. The incoming buffer is
+---relocated to a fresh tabpage and the panel buffer is restored, so the
+---file still opens — just never inside the panel. A deleted panel buffer
+---tears the panel down and it is rebuilt on the next open.
 local function guard_panel_buffers()
   if state.closing or not state.chat_win then
     return
@@ -122,21 +123,25 @@ local function guard_panel_buffers()
     M.close()
     return
   end
-  local snapped = false
+  local relocated = {}
   if vim.api.nvim_win_is_valid(state.chat_win)
     and vim.api.nvim_win_get_buf(state.chat_win) ~= state.chat_buf
   then
+    relocated[#relocated + 1] = vim.api.nvim_win_get_buf(state.chat_win)
     vim.api.nvim_win_set_buf(state.chat_win, state.chat_buf)
-    snapped = true
   end
   if vim.api.nvim_win_is_valid(state.input_win)
     and vim.api.nvim_win_get_buf(state.input_win) ~= state.input_buf
   then
+    relocated[#relocated + 1] = vim.api.nvim_win_get_buf(state.input_win)
     vim.api.nvim_win_set_buf(state.input_win, state.input_buf)
-    snapped = true
   end
-  if snapped then
-    vim.notify("ndsh: panel windows are reserved; close the panel to reuse them", vim.log.levels.INFO)
+  for _, buf in ipairs(relocated) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.cmd("tabnew")
+      vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
+      vim.notify("ndsh: opened in a new tab (panel windows are reserved)", vim.log.levels.INFO)
+    end
   end
 end
 
