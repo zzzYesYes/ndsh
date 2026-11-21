@@ -10,6 +10,9 @@ local prompts = require("ndsh.ui.prompts")
 
 local M = {}
 
+-- Forward declaration: open() refreshes chrome before its definition site.
+local refresh_chrome
+
 local state = {
   cfg = nil, ---@type table|nil
   chat_buf = nil, ---@type integer|nil
@@ -22,6 +25,9 @@ local state = {
   status = "idle",
   conn = "stopped", -- session connection state: starting|ready|error|stopped
   session = nil, ---@type table|nil NdsSession
+  route = nil, ---@type { provider: string, model: string }|nil
+  context = { used = nil, window = nil }, ---@type { used: integer|nil, window: integer|nil }
+  cwd = nil, ---@type string|nil session working directory
 }
 
 local function ensure_setup()
@@ -188,7 +194,7 @@ function M.open(opts)
     state.chat_win = wins.chat
     state.input_win = wins.input
     state.takeover = wins.takeover
-    input.set_status(state.input_win, state.status)
+    refresh_chrome()
     watch_windows()
   end
   M._ensure_session()
@@ -300,6 +306,55 @@ function M.focus_input()
   end
 end
 
+---Format a token count compactly: 1234 → "1.2k", 1234567 → "1.2M".
+local function fmt_tokens(n)
+  if n >= 1000000 then
+    return ("%.1fM"):format(n / 1000000)
+  elseif n >= 10000 then
+    return ("%dk"):format(n / 1000)
+  elseif n >= 1000 then
+    return ("%.1fk"):format(n / 1000)
+  end
+  return tostring(n)
+end
+
+---Connection state to winbar text outside the ready state.
+local CONN_LABEL = {
+  starting = "connecting…",
+  error = "error (:NDSHRestart)",
+  stopped = "stopped",
+}
+
+---Refresh both panel winbars from current state:
+--- chat  — active model and session working directory
+--- input — connection/agent status and context usage
+refresh_chrome = function()
+  if state.chat_win and vim.api.nvim_win_is_valid(state.chat_win) then
+    local model = state.route and state.route.model or state.cfg.dsh.model
+    local cwd = state.cwd and vim.fn.fnamemodify(state.cwd, ":~") or ""
+    vim.api.nvim_set_option_value(
+      "winbar",
+      (" %s%s%s"):format(model, cwd ~= "" and " · " or "", cwd),
+      { win = state.chat_win }
+    )
+  end
+  if state.input_win and vim.api.nvim_win_is_valid(state.input_win) then
+    local label = state.conn == "ready" and state.status or (CONN_LABEL[state.conn] or state.conn)
+    local ctx = ""
+    if state.context.used then
+      ctx = " · " .. fmt_tokens(state.context.used)
+      if state.context.window then
+        -- winbar is statusline syntax: a literal % must be doubled.
+        ctx = ctx .. ("/%s · %d%%%%"):format(
+          fmt_tokens(state.context.window),
+          math.floor(state.context.used / state.context.window * 100 + 0.5)
+        )
+      end
+    end
+    input.set_status(state.input_win, label .. ctx)
+  end
+end
+
 ---Apply one projected writer operation.
 ---@param op table
 local function apply_op(op)
@@ -318,19 +373,16 @@ local function apply_op(op)
     chat.error(buf, op.text)
   elseif op.op == "status" then
     state.status = op.text
-    -- Connection state owns the winbar outside "ready".
-    if state.conn == "ready" then
-      input.set_status(state.input_win, op.text)
-    end
+    refresh_chrome()
+  elseif op.op == "usage" then
+    state.context.used = op.input
+    refresh_chrome()
+  elseif op.op == "route" then
+    state.route = { provider = op.provider, model = op.model }
+    state.context.window = op.window or state.context.window
+    refresh_chrome()
   end
 end
-
----Connection state to winbar text outside the ready state.
-local CONN_LABEL = {
-  starting = "connecting…",
-  error = "error (:NDSHRestart)",
-  stopped = "stopped",
-}
 
 ---Create and start the runtime session on first use.
 function M._ensure_session()
@@ -340,6 +392,8 @@ function M._ensure_session()
     end
     return
   end
+  state.route = { provider = state.cfg.dsh.provider, model = state.cfg.dsh.model }
+  state.cwd = vim.uv.cwd()
   state.session = Session.new(state.cfg, {
     on_event = function(event)
       M._apply_event(event)
@@ -349,7 +403,7 @@ function M._ensure_session()
     end,
     on_state = function(conn)
       state.conn = conn
-      input.set_status(state.input_win, conn == "ready" and state.status or CONN_LABEL[conn] or conn)
+      refresh_chrome()
     end,
     on_notify = function(msg, level)
       vim.notify(msg, level)

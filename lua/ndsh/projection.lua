@@ -49,10 +49,21 @@ function M.project(event)
     return {}
   elseif t == "assistant/message" then
     local message = d.message or {}
-    return {
+    local ops = {
       { op = "begin_message", role = "assistant" },
       { op = "append", text = text_of(message.content) },
       { op = "end_message" },
+    }
+    if d.usage and d.usage.inputTokens then
+      -- inputTokens is the request's prompt size, i.e. context fill.
+      ops[#ops + 1] = { op = "usage", input = d.usage.inputTokens }
+    end
+    return ops
+  elseif t == "request/context" then
+    -- Route metadata, logged when route or capacity changes; carries the
+    -- model's advertised context window for the usage meter.
+    return {
+      { op = "route", provider = d.provider, model = d.model, window = d.contextWindow },
     }
   elseif t == "tool/call" then
     return {

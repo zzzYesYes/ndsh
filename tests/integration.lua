@@ -35,6 +35,11 @@ local function winbar_text(win)
   return vim.api.nvim_get_option_value("winbar", { win = win })
 end
 
+---The winbar carries a context-usage suffix after the status word.
+local function has_status(win, status)
+  return winbar_text(win):find("^ ndsh · " .. status) ~= nil
+end
+
 local ndsh = require("ndsh")
 ndsh.setup({
   restore = "scratch",
@@ -56,7 +61,7 @@ for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
 end
 
 local ready = vim.wait(10000, function()
-  return winbar_text(input_win) == " ndsh · idle"
+  return has_status(input_win, "idle")
 end, 50)
 check("handshake completes (winbar idle)", ready)
 
@@ -74,8 +79,19 @@ check("user message rendered", chat_text():find("❯ You", 1, true) ~= nil)
 check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo hi\"%}") ~= nil)
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
+-- Chrome: chat winbar shows model and cwd, input winbar shows context usage.
+local chat_winbar = winbar_text(vim.fn.bufwinid(chat_buf))
+check(
+  "chat winbar shows model and cwd",
+  chat_winbar:find("fake%-v1") ~= nil and chat_winbar:find(vim.fn.fnamemodify(vim.uv.cwd(), ":~"), 1, true) ~= nil
+)
+check(
+  "input winbar shows context usage",
+  winbar_text(input_win):find("12k/128k · 10%%%%") ~= nil
+)
+
 local back_idle = vim.wait(5000, function()
-  return winbar_text(input_win) == " ndsh · idle"
+  return has_status(input_win, "idle")
 end, 50)
 check("status returns to idle", back_idle)
 
@@ -90,7 +106,7 @@ check("approval request answered and rendered", approved)
 -- reach ready and serve prompts; the old process's exit must not poison it.
 ndsh.restart_session()
 local re_ready = vim.wait(10000, function()
-  return winbar_text(input_win) == " ndsh · idle"
+  return has_status(input_win, "idle")
 end, 50)
 check("restart reaches ready", re_ready)
 ndsh._on_send("after restart")
@@ -102,7 +118,7 @@ check("prompt after restart renders", second)
 -- 4. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()
 local stopped = vim.wait(5000, function()
-  return winbar_text(input_win) == " ndsh · stopped"
+  return has_status(input_win, "stopped")
 end, 50)
 check("stop is quiet and shows stopped", stopped)
 

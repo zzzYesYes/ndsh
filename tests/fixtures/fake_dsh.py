@@ -46,9 +46,13 @@ def run_query(msg):
     event(session_id, "user/message", {
         "content": text_block(text), "source": {"kind": "user"},
     })
+    event(session_id, "request/context", {
+        "provider": "fake", "model": "fake-v1", "contextWindow": 128000,
+    })
     event(session_id, "assistant/message", {
         "turn": 1, "step": 1,
         "message": {"content": text_block("FAKE-INTRO: running a tool now")},
+        "usage": {"inputTokens": 12345, "outputTokens": 42},
     })
 
     outcome = None

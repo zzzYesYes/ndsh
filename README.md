@@ -46,11 +46,15 @@ only pane left, closing it exits Neovim like `:q` on the last file window
 dashboard plugin), `"scratch"` (empty buffer), or a `fun(win)` hook.
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
-native. Chat buffer locals: `q` closes, `i` jumps to input, `<Tab>` toggles
-tool-result folds. Input: `<C-s>` sends (insert and normal mode), `<CR>` is a
-plain newline in insert mode and sends in normal mode. If your global "tab"
-keys operate on buffers (e.g. barbar), set `keys.tabnext`/`keys.tabprev` so
-they switch real tabpages inside the panel.
+native. The message pane's winbar shows the active model and the session
+working directory; the input pane's winbar shows connection/agent status and
+live context usage (`12k/128k · 10%`), fed by `request/context` capacity
+events and per-message token usage. Chat buffer locals: `q` closes, `i`
+jumps to input, `<Tab>` toggles tool-result folds. Input: `<C-s>` sends
+(insert and normal mode), `<CR>` is a plain newline in insert mode and sends
+in normal mode. If your global "tab" keys operate on buffers (e.g. barbar),
+set `keys.tabnext`/`keys.tabprev` so they switch real tabpages inside the
+panel.
 
 ## Runtime connection
 

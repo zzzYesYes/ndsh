@@ -127,6 +127,29 @@ do
     data = { callId = "c", name = "bash", arguments = '{\n  "command": "ls"\n}' },
   })
   check("tool call summary is one line", call[1].summary == '{ "command": "ls" }')
+
+  local with_usage = projection.project({
+    type = "assistant/message",
+    data = {
+      turn = 1,
+      step = 1,
+      message = { content = { { type = "text", text = "hi" } } },
+      usage = { inputTokens = 1000, outputTokens = 10 },
+    },
+  })
+  check(
+    "assistant usage projects usage op",
+    with_usage[#with_usage].op == "usage" and with_usage[#with_usage].input == 1000
+  )
+
+  local route = projection.project({
+    type = "request/context",
+    data = { provider = "p", model = "m", contextWindow = 128000 },
+  })
+  check(
+    "request/context projects route op",
+    route[1].op == "route" and route[1].model == "m" and route[1].window == 128000
+  )
 end
 
 -- Credential store roundtrip and file permissions.
