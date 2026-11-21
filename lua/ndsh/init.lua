@@ -296,6 +296,8 @@ local function apply_op(op)
     chat.tool_begin(buf, op.id, op.name, op.summary)
   elseif op.op == "tool_end" then
     chat.tool_end(buf, op.id, op.ok, op.output)
+  elseif op.op == "error" then
+    chat.error(buf, op.text)
   elseif op.op == "status" then
     state.status = op.text
     -- Connection state owns the winbar outside "ready".
@@ -355,6 +357,25 @@ function M.restart_session()
   end
 end
 
+---Show the runtime's captured stderr log in a scratch split.
+function M.show_logs()
+  local lines = state.session and state.session:logs() or {}
+  if #lines == 0 then
+    lines = { "(no runtime logs)" }
+  end
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = buf })
+  vim.cmd("botright 15split")
+  local win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(win, buf)
+  vim.keymap.set("n", "q", function()
+    if vim.api.nvim_win_is_valid(win) then
+      vim.api.nvim_win_hide(win)
+    end
+  end, { buffer = buf, desc = "Close ndsh log" })
+end
+
 ---Feed one session event through projection and apply the resulting ops.
 ---@param event table
 function M._apply_event(event)
@@ -368,10 +389,14 @@ function M._apply_event(event)
   end
 end
 
----Send user input to the runtime. The user/message renders when its
----session event commits, so the transcript always shows runtime truth.
+---Echo user input locally, then send it to the runtime. The wire only
+---commits user/message when a step admits the input, so the echo is the
+---only reliable "You" line; wire user/message events are not rendered.
 ---@param text string
 function M._on_send(text)
+  apply_op({ op = "begin_message", role = "user" })
+  apply_op({ op = "append", text = text })
+  apply_op({ op = "end_message" })
   if not state.session then
     vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
     return

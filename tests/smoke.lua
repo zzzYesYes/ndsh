@@ -51,12 +51,10 @@ if input_buf then
   )
 end
 
--- 2. Feed events through the real projection path, synchronously.
+-- 2. Feed events through the real projection path, synchronously. The user
+-- prompt takes the local echo path (wire user/message is not rendered).
 ndsh._apply_event({ type = "turn/start", data = { turn = 1 } })
-ndsh._apply_event({
-  type = "user/message",
-  data = { content = { { type = "text", text = "hello ndsh" } }, source = { kind = "user" } },
-})
+ndsh._on_send("hello ndsh")
 ndsh._apply_event({
   type = "assistant/message",
   data = {

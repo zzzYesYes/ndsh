@@ -26,3 +26,7 @@ end, { desc = "Stop the ndsh runtime" })
 vim.api.nvim_create_user_command("NDSHRestart", function()
   require("ndsh").restart_session()
 end, { desc = "Restart the ndsh runtime" })
+
+vim.api.nvim_create_user_command("NDSHLog", function()
+  require("ndsh").show_logs()
+end, { desc = "Show the ndsh runtime log" })

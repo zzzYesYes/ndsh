@@ -109,9 +109,18 @@ do
 
   local synthetic = projection.project({
     type = "user/message",
-    data = { content = { { type = "text", text = "injected" } }, source = { kind = "inject" } },
+    data = { content = { { type = "text", text = "hello" } }, source = { kind = "user" } },
   })
-  check("synthetic user context not rendered", #synthetic == 0)
+  check("wire user/message not rendered (echoed locally at send)", #synthetic == 0)
+
+  local failed = projection.project({
+    type = "turn/end",
+    data = { turn = 1, reason = { kind = "error", error = { message = "model exploded" } } },
+  })
+  check(
+    "failed turn surfaces error op",
+    failed[1].op == "status" and failed[2] ~= nil and failed[2].op == "error" and failed[2].text:find("model exploded", 1, true) ~= nil
+  )
 
   local call = projection.project({
     type = "tool/call",

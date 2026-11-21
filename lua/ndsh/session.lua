@@ -19,7 +19,17 @@ local function resolve_cmd(cfg)
   end
   local checkout = vim.fn.expand("~/workspace/deepseek-harness")
   if vim.fn.isdirectory(checkout) == 1 then
-    return { "pnpm", "-C", checkout, "dsh", "--profile", cfg.dsh.profile }
+    local pnpm = vim.fn.exepath("pnpm")
+    if pnpm == "" then
+      -- Common standalone install location outside PATH.
+      local candidate = vim.fn.expand("~/.local/share/pnpm/bin/pnpm")
+      if vim.fn.executable(candidate) == 1 then
+        pnpm = candidate
+      end
+    end
+    if pnpm ~= "" then
+      return { pnpm, "-C", checkout, "dsh", "--profile", cfg.dsh.profile }
+    end
   end
   return nil, "no dsh executable found; set dsh.cmd in setup()"
 end
@@ -41,6 +51,7 @@ function M.new(cfg, cb)
     state = "stopped",
     session_id = ("ndsh-%d-%d"):format(os.time(), math.random(100000)),
     queue = {}, ---@type string[] prompts sent before ready
+    log = {}, ---@type string[] stderr ring buffer for :NDSHLog
     job = nil,
     protocol = nil,
   }, M)
@@ -100,10 +111,18 @@ function M:start()
   set_state(self, "starting")
   local ok, job_or_err = pcall(Job.spawn, cmd, {
     on_frame = function(line)
-      self.protocol:handle_line(line)
+      -- Frames can arrive after stop() tore the protocol down.
+      if self.protocol then
+        self.protocol:handle_line(line)
+      end
     end,
     on_stderr = function(line)
-      self.cb.on_notify("ndsh runtime: " .. line, vim.log.levels.DEBUG)
+      -- Runtime logs are noisy by nature (boot warnings, provider traces);
+      -- keep a ring buffer for :NDSHLog instead of notifying every line.
+      self.log[#self.log + 1] = line
+      if #self.log > 200 then
+        table.remove(self.log, 1)
+      end
     end,
     on_exit = function(code)
       self:_on_exit(code)
@@ -174,6 +193,12 @@ function M:send(text)
       self.cb.on_notify("ndsh: prompt rejected: " .. vim.inspect(err), vim.log.levels.ERROR)
     end
   end)
+end
+
+---Captured stderr lines (ring buffer, newest last).
+---@return string[]
+function M:logs()
+  return self.log
 end
 
 function M:stop()

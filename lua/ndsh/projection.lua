@@ -42,16 +42,11 @@ function M.project(event)
   local t = event.type
   local d = event.data or {}
   if t == "user/message" then
-    -- Synthetic user-role context (agent.inject, skill content, ...) stays
-    -- off the transcript; only direct human prompts render as "You".
-    if d.source and d.source.kind ~= "user" then
-      return {}
-    end
-    return {
-      { op = "begin_message", role = "user" },
-      { op = "append", text = text_of(d.content) },
-      { op = "end_message" },
-    }
+    -- User prompts are echoed locally at send time: the wire only commits
+    -- user/message when a step admits the input, so rendering it here would
+    -- both duplicate the echo and leave failed turns silent. Synthetic
+    -- user-role context (agent.inject, skill content, ...) never renders.
+    return {}
   elseif t == "assistant/message" then
     local message = d.message or {}
     return {
@@ -71,7 +66,14 @@ function M.project(event)
   elseif t == "turn/start" then
     return { { op = "status", text = "running" } }
   elseif t == "turn/end" then
-    return { { op = "status", text = "idle" } }
+    local ops = { { op = "status", text = "idle" } }
+    -- A failed turn commits no messages; surface the reason visibly.
+    local reason = d.reason
+    if type(reason) == "table" and reason.kind == "error" then
+      local message = (type(reason.error) == "table" and reason.error.message) or "unknown error"
+      ops[#ops + 1] = { op = "error", text = "turn failed: " .. message }
+    end
+    return ops
   end
   return {}
 end

@@ -182,4 +182,21 @@ function M.tool_end(buf, id, ok, output)
   fold_range(buf, first, first + #lines - 2)
 end
 
+---Render an error block in the transcript (e.g. a failed turn's reason).
+---@param buf integer
+---@param text string
+function M.error(buf, text)
+  local s = state(buf)
+  local first = s.empty and 0 or vim.api.nvim_buf_line_count(buf)
+  local lines = {}
+  for _, line in ipairs(vim.split(text, "\n", { plain = true })) do
+    lines[#lines + 1] = "✗ " .. line
+  end
+  lines[#lines + 1] = ""
+  append_lines(buf, lines)
+  for lnum = first, first + #lines - 2 do
+    highlight_line(buf, lnum, "NDSHToolErr")
+  end
+end
+
 return M
