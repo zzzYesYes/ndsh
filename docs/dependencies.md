@@ -36,7 +36,7 @@ under `nvim -u NONE` to prove this stays true.
 
 | Plugin | Why |
 |---|---|
-| lualine | disabled for panel filetypes (`ndsh`, `ndshinput`) via the user's lualine config, so our statuslines stay blank; panel chrome uses winbar, which lualine never touches |
+| lualine | none — panel chrome uses winbar, which statusline plugins never touch; panel statuslines render normally |
 
 ## Rules
 

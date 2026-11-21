@@ -43,9 +43,6 @@ local function set_chat_win_options(win)
     foldenable = true,
     conceallevel = 2,
     winfixwidth = false,
-    -- Blank, not default: stops the "[No Name][-]" default render. lualine
-    -- is disabled for the panel filetypes so it stays ours.
-    statusline = " ",
   }
   for k, v in pairs(opts) do
     vim.api.nvim_set_option_value(k, v, { win = win })
@@ -54,7 +51,6 @@ end
 
 local function set_input_win_options(win, cfg)
   vim.api.nvim_set_option_value("winfixheight", true, { win = win })
-  vim.api.nvim_set_option_value("statusline", " ", { win = win })
   vim.api.nvim_win_set_height(win, cfg.input_height)
 end
 
@@ -70,10 +66,15 @@ end
 
 local function show_takeover(cfg, chat_buf, input_buf)
   local chat_win = vim.api.nvim_get_current_win()
+  -- Judge the replaced buffer before replacing it: wipe-hidden buffers
+  -- (dashboards) are gone the moment they leave the window.
+  local prev_buf = vim.api.nvim_win_get_buf(chat_win)
+  local prev_contentful = vim.api.nvim_buf_get_name(prev_buf) ~= ""
+    or vim.api.nvim_get_option_value("filetype", { buf = prev_buf }) ~= ""
   vim.api.nvim_win_set_buf(chat_win, chat_buf)
   set_chat_win_options(chat_win)
   local input_win = split_input_below(cfg, input_buf)
-  return chat_win, input_win
+  return chat_win, input_win, prev_buf, prev_contentful
 end
 
 local function show_right(cfg, chat_buf, input_buf)
@@ -126,13 +127,15 @@ local function show_float(cfg, chat_buf, input_buf)
 end
 
 ---Open the panel windows. Chooses full-tab takeover when the tab holds one
----empty window, otherwise the configured dock mode.
----@return { chat: integer, input: integer, takeover: boolean }
+---empty window, otherwise the configured dock mode. In takeover mode the
+---replaced buffer is returned so close() can restore it.
+---@return { chat: integer, input: integer, takeover: boolean, prev_buf: integer|nil, prev_contentful: boolean|nil }
 function M.show(cfg, chat_buf, input_buf)
   local takeover = should_takeover()
   local chat_win, input_win
+  local prev_buf, prev_contentful = nil, false
   if takeover then
-    chat_win, input_win = show_takeover(cfg, chat_buf, input_buf)
+    chat_win, input_win, prev_buf, prev_contentful = show_takeover(cfg, chat_buf, input_buf)
   elseif cfg.layout == "right" then
     chat_win, input_win = show_right(cfg, chat_buf, input_buf)
   elseif cfg.layout == "bottom" then
@@ -141,7 +144,13 @@ function M.show(cfg, chat_buf, input_buf)
     chat_win, input_win = show_float(cfg, chat_buf, input_buf)
   end
   vim.fn.win_gotoid(input_win)
-  return { chat = chat_win, input = input_win, takeover = takeover }
+  return {
+    chat = chat_win,
+    input = input_win,
+    takeover = takeover,
+    prev_buf = prev_buf,
+    prev_contentful = prev_contentful,
+  }
 end
 
 ---Hide one window, or replace its buffer with an empty scratch when it is

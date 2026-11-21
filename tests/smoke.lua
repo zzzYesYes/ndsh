@@ -135,7 +135,8 @@ ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)
 check("docked close: only code window remains", #wins == 1)
 
--- 6. A dashboard-style nofile buffer also counts as "no code buffer up".
+-- 6. A dashboard-style nofile buffer also counts as "no code buffer up",
+-- and closing the panel restores it instead of quitting or scratching.
 vim.cmd("enew")
 local dash = vim.api.nvim_get_current_buf()
 vim.api.nvim_set_option_value("buftype", "nofile", { buf = dash })
@@ -144,6 +145,12 @@ ndsh.open()
 wins = vim.api.nvim_tabpage_list_wins(0)
 check("dashboard: panel takes over (2 windows)", #wins == 2)
 ndsh.close()
+wins = vim.api.nvim_tabpage_list_wins(0)
+check("dashboard: single window survives", #wins == 1)
+check(
+  "dashboard: closing restores the replaced buffer",
+  vim.api.nvim_win_get_buf(wins[1]) == dash
+)
 
 -- 7. Explicit full mode always opens a dedicated tab, even from a
 -- dashboard-style single window, so gt/gT always has somewhere to go.

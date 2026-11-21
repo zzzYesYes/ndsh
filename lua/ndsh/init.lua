@@ -28,6 +28,9 @@ local state = {
   route = nil, ---@type { provider: string, model: string }|nil
   context = { used = nil, window = nil }, ---@type { used: integer|nil, window: integer|nil }
   cwd = nil, ---@type string|nil session working directory
+  -- What a takeover replaced, for restoration on close.
+  prev_buf = nil, ---@type integer|nil
+  prev_contentful = false,
 }
 
 local function ensure_setup()
@@ -204,6 +207,8 @@ function M.open(opts)
     state.chat_win = wins.chat
     state.input_win = wins.input
     state.takeover = wins.takeover
+    state.prev_buf = wins.prev_buf
+    state.prev_contentful = wins.prev_contentful or false
     refresh_chrome()
     watch_windows()
   end
@@ -241,13 +246,15 @@ function M.close()
   if not chat_valid and not input_valid then
     state.chat_win, state.input_win = nil, nil
     state.takeover, state.full_tab = false, false
+    state.prev_buf, state.prev_contentful = nil, false
     return
   end
-  -- Only the panel is left in the only tab: closing it exits Neovim like
-  -- :q on the last file window. Falls through to hide on :quitall failure
-  -- (e.g. a modified hidden buffer) and restores a scratch instead.
+  -- Only the panel is left in the only tab. A takeover that replaced real
+  -- content (a dashboard or any buffer) restores it on close; a takeover
+  -- from an empty scratch applies the restore mode ("quit" exits Neovim
+  -- like :q on the last file window).
   local only_pane = state.takeover and #vim.api.nvim_list_tabpages() == 1
-  if only_pane and state.cfg.restore == "quit" then
+  if only_pane and not state.prev_contentful and state.cfg.restore == "quit" then
     if pcall(vim.cmd, "quitall") then
       return
     end
@@ -268,13 +275,24 @@ function M.close()
   state.takeover = false
   state.full_tab = false
   if survivor and vim.api.nvim_win_is_valid(survivor) then
-    local restore = state.cfg.restore
-    if type(restore) == "function" then
-      pcall(restore, survivor)
-    elseif restore == "dashboard" then
-      restore_dashboard(survivor)
+    if state.prev_contentful then
+      if state.prev_buf and vim.api.nvim_buf_is_valid(state.prev_buf) then
+        vim.api.nvim_win_set_buf(survivor, state.prev_buf)
+      else
+        -- Some dashboards wipe their buffer when replaced; reopen instead.
+        restore_dashboard(survivor)
+      end
+    else
+      local restore = state.cfg.restore
+      if type(restore) == "function" then
+        pcall(restore, survivor)
+      elseif restore == "dashboard" then
+        restore_dashboard(survivor)
+      end
     end
   end
+  state.prev_buf = nil
+  state.prev_contentful = false
   -- WinClosed handlers are scheduled, so the guard lifts after they run.
   vim.schedule(function()
     state.closing = false
