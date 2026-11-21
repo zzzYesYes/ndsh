@@ -1,0 +1,6 @@
+.DS_Store
+*.swp
+*.swo
+.tags
+luarocks/
+.luarc.json.local
