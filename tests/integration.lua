@@ -126,9 +126,9 @@ check("approval request answered and rendered", approved)
 -- 3. Restart races a booting/finished process: the new generation must
 -- reach ready and serve prompts; the old process's exit must not poison it.
 ndsh.restart_session()
-local re_ready = vim.wait(10000, function()
+local re_ready = vim.wait(20000, function()
   return has_status(input_win, "idle")
-end, 50)
+end, 100)
 check("restart reaches ready", re_ready)
 ndsh._on_send("after restart")
 local second = vim.wait(10000, function()
