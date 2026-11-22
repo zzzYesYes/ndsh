@@ -122,6 +122,12 @@ local approved = vim.wait(10000, function()
   return chat_text():find("approval outcome: allowed%-once") ~= nil
 end, 100)
 check("approval request answered and rendered", approved)
+-- The turn settles (turn/end, status idle) just after the outcome event;
+-- synchronize before the restart so it cannot kill the runtime mid-turn.
+local settled = vim.wait(5000, function()
+  return has_status(input_win, "idle")
+end, 50)
+check("approval turn settles to idle", settled)
 
 -- 3. Restart races a booting/finished process: the new generation must
 -- reach ready and serve prompts; the old process's exit must not poison it.

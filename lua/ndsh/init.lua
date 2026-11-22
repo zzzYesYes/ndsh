@@ -311,8 +311,16 @@ function M._ensure_runtime()
     end,
     on_state = function(conn)
       state.conn = conn
-      for _, conv in ipairs(state.conversations) do
-        conv:refresh_chrome()
+      if conn == "stopped" or conn == "error" then
+        -- A dead runtime runs nothing: any turn in flight when it stopped
+        -- is over, and no session.status will arrive to say so.
+        for _, conv in ipairs(state.conversations) do
+          conv:set_status("idle")
+        end
+      else
+        for _, conv in ipairs(state.conversations) do
+          conv:refresh_chrome()
+        end
       end
     end,
     on_notify = function(msg, level)
