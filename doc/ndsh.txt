@@ -1,0 +1,85 @@
+*ndsh.txt*  Neovim chat UI for DeepSeek Harness
+
+==============================================================================
+INTRODUCTION                                                          *ndsh*
+
+ndsh renders a chat panel for a dsh runtime (`dsh --profile sdk`) in native
+Neovim windows. The panel has two panes: the message pane (transcript) on
+top and the chat (input) pane below.
+
+==============================================================================
+PANEL KEYS                                                      *ndsh-keys*
+
+These keys are buffer-local to the panel and stable. Leader-prefixed
+mappings are NOT documented here: they are user configuration (see
+|ndsh-config-keys|) and may be changed freely.
+
+Message pane (readonly transcript):
+  q              Close the panel (detaches the session)
+  i              Jump to the input pane, insert mode
+  <Tab>          Toggle the fold under cursor (same as |za|)
+  za             Toggle fold: tool results and reasoning blocks
+  zR / zM        Open / close all folds (native)
+  /              Search the transcript (native)
+  All other normal-mode motions, yank, and marks work natively.
+
+Input pane:
+  <C-s>          Send message (insert and normal mode)
+  <CR>           Insert mode: plain newline. Normal mode: send.
+  <Esc>          Normal editing as usual; the buffer is a normal buffer.
+
+Window management:
+  <C-w>h/j/k/l   Native window navigation works everywhere
+  <C-w>> etc.    Native resizing works on the panel windows
+
+==============================================================================
+SLASH COMMANDS                                                *ndsh-slash*
+
+Local commands typed into the input pane. They are handled by the plugin
+and highlighted while typing; unknown slash text is sent to the runtime.
+
+  /rename {name}     Rename the current session (shown on its winbar)
+
+==============================================================================
+COMMANDS                                                     *ndsh-commands*
+
+  :NDSHToggle        Toggle the panel
+  :NDSHOpen          Open the panel
+  :NDSHClose         Close the panel
+  :NDSHNew [name]    Create a session and swap the panel to it
+  :NDSHSessions      Session navigator (telescope or vim.ui picker)
+  :NDSHRename [name] Rename the current session
+  :NDSHConnect       Connect a provider (stores credentials)
+  :NDSHModel         Select the active model (restarts the runtime)
+  :NDSHStop          Stop the runtime
+  :NDSHRestart       Restart the runtime
+  :NDSHLog           Show the captured runtime stderr log
+  :NDSHDemo          Play a scripted demo session
+
+==============================================================================
+CONFIGURATION                                                  *ndsh-config*
+
+setup({}) accepts, among others:
+  layout            "right" | "bottom" | "float"
+  input_height      input pane rows
+  restore           "quit" | "dashboard" | "scratch" | fun(win)
+  store_path        credentials/session store location
+
+                                                          *ndsh-config-keys*
+Key mappings are fields under keys = {} and are intentionally user-owned:
+  keys.toggle       panel toggle
+  keys.sessions     session navigator
+  keys.new_session  new session
+  keys.send         list of send keys in the input pane
+  keys.tabnext      tabpage navigation inside panel windows
+  keys.tabprev      tabpage navigation inside panel windows
+
+==============================================================================
+CHROME                                                          *ndsh-chrome*
+
+The message pane winbar shows the session name (● marks unread activity).
+The input pane winbar shows agent status (an ASCII spinner while running),
+the active model on the left, and the working directory with context usage
+(used/window · %) on the right.
+
+ vim:tw=78:ts=8:ft=help:norl:

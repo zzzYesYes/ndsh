@@ -25,6 +25,10 @@ set runtimepath+=~/workspace/ndsh
 
 ## Usage
 
+Full key reference lives in the vim help: `:helptags doc` then `:help ndsh`
+(it documents the stable panel-local keys; leader mappings are user config
+and intentionally not pinned down there).
+
 | Command | Action |
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ant`) |
