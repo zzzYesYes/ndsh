@@ -27,6 +27,25 @@ SDK, and the wire docs in the same PR.
 4. **Model catalog query.** No way to list available routes/models over
    the wire. Would let `:NDSHModel` offer live discovery instead of static
    config.
+5. **Command catalog, two related asks.** The SDK server resolves slash
+   commands against the booted profile's catalog, and the shipped sdk
+   profile mounts only `compact`, `goal`, `plan`; `export`
+   (dsh-session-log-export), `feedback` (dsh-command-feedback), and
+   `permission` (dsh-permission-presets) resolve as plain prompts (verified
+   against a live runtime). Two options, both worth recording:
+   - **Upstream PR**: mount the full builtin catalog in the sdk profile
+     (or ship it as a documented sdk-full variant), so SDK clients get the
+     same commands as the Web/Desktop profiles. We plan to fork dsh and
+     send this PR.
+   - **Profile patch (available today)**: ndsh could ship a cordis patch
+     mounting the three command-provider plugins into the sdk profile at
+     launch. Untested: whether their service dependencies exist in
+     `dsh-base` (permission presets likely yes — preset events already
+     flow; feedback may need the account/telemetry plane). A spike would
+     turn load failures into the exact upstream evidence.
+   - **Discovery**: whichever way, a catalog query (`commands/list`) lets
+     clients stop mirroring the command set by hand — ndsh currently
+     hardcodes {compact, goal, plan} for highlight and completion.
 
 ## Until then
 
