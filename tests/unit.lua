@@ -236,8 +236,8 @@ do
     not commands.run(conv, "/compact") and not commands.run(conv, "/goal finish this")
   )
   check(
-    "wire_names mirrors the dsh builtin set",
-    table.concat(commands.wire_names(), ",") == "compact,export,feedback,goal,permission,plan"
+    "wire_names mirrors the sdk-profile command set",
+    table.concat(commands.wire_names(), ",") == "compact,goal,plan"
   )
   -- Completion: silent off-slash, completes after "/".
   vim.api.nvim_buf_set_lines(0, 0, -1, false, { "plain text" })
@@ -258,10 +258,7 @@ do
     words[#words + 1] = item.word
   end
   table.sort(words)
-  check(
-    "completion offers wire commands",
-    table.concat(words, ",") == "permission,plan"
-  )
+  check("completion offers wire commands", table.concat(words, ",") == "plan")
 end
 
 -- Spinner: a running conversation shows the animated frame in its winbar.

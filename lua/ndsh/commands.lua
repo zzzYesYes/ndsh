@@ -30,13 +30,14 @@ function M.names()
   return names
 end
 
----Commands the dsh runtime routes natively (its builtin set: resolved by
----the server's resolveCommand, which also accepts Chinese spellings).
----They are never intercepted locally; unknown slash text reaches the wire
----unchanged. Kept in sync manually until the SDK exposes a catalog query.
+---Commands the dsh runtime routes natively in the sdk profile. Verified
+---against a live runtime: compact, goal and plan resolve as commands;
+---export, feedback and permission are Host/Web-side and fall through as
+---plain prompts on this wire. Never intercepted locally. Kept in sync
+---manually until the SDK exposes a catalog query.
 ---@return string[]
 function M.wire_names()
-  return { "compact", "export", "feedback", "goal", "permission", "plan" }
+  return { "compact", "goal", "plan" }
 end
 
 ---Completion for the input pane (:h complete-functions). Completes local
