@@ -29,6 +29,8 @@ function M.create(cfg, on_send, suffix)
   vim.api.nvim_set_option_value("swapfile", false, { buf = buf })
   -- Own filetype so statusline plugins can be disabled for panel windows.
   vim.api.nvim_set_option_value("filetype", "ndshinput", { buf = buf })
+  -- Slash command completion: <C-x><C-u> after a leading "/".
+  vim.api.nvim_set_option_value("completefunc", "v:lua.require'ndsh.commands'.complete", { buf = buf })
   -- Named (uniquely per conversation), so :edit in the pane cannot reuse
   -- this buffer for a file.
   vim.api.nvim_buf_set_name(buf, "ndsh://input/" .. suffix)
@@ -61,25 +63,31 @@ function M.set_status(win, text)
   end
 end
 
----Highlight local slash commands live while typing, opencode-style.
----Window-local matches re-evaluate on every buffer change, so /rename
----lights up as soon as it becomes a valid command.
+---Highlight local and runtime slash commands live while typing.
+---Window-local matches re-evaluate on every buffer change; local commands
+---and runtime-builtin commands get distinct groups.
 ---@param win integer input window
----@param names string[] registered local command names
-function M.highlight_commands(win, names)
-  if not (win and vim.api.nvim_win_is_valid(win)) or #names == 0 then
+---@param local_names string[] registered local command names
+---@param wire_names string[] runtime-builtin command names
+function M.highlight_commands(win, local_names, wire_names)
+  if not (win and vim.api.nvim_win_is_valid(win)) then
     return
   end
   vim.api.nvim_set_hl(0, "NDSHSlashCommand", { link = "Special", default = true })
-  local pattern = [[^/\%(]] .. table.concat(names, [[\|]]) .. [[\)\>]]
+  vim.api.nvim_set_hl(0, "NDSHWireCommand", { link = "Identifier", default = true })
   vim.api.nvim_win_call(win, function()
     -- Replace, not stack, on re-application.
     for _, match in ipairs(vim.fn.getmatches(win)) do
-      if match.group == "NDSHSlashCommand" then
+      if match.group == "NDSHSlashCommand" or match.group == "NDSHWireCommand" then
         vim.fn.matchdelete(match.id, win)
       end
     end
-    vim.fn.matchadd("NDSHSlashCommand", pattern, 10, -1, { window = win })
+    if #local_names > 0 then
+      vim.fn.matchadd("NDSHSlashCommand", [[^/\%(]] .. table.concat(local_names, [[\|]]) .. [[\)\>]], 10, -1, { window = win })
+    end
+    if #wire_names > 0 then
+      vim.fn.matchadd("NDSHWireCommand", [[^/\%(]] .. table.concat(wire_names, [[\|]]) .. [[\)\>]], 10, -1, { window = win })
+    end
   end)
 end
 

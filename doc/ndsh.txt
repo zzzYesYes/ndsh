@@ -26,6 +26,7 @@ Message pane (readonly transcript):
 Input pane:
   <C-s>          Send message (insert and normal mode)
   <CR>           Insert mode: plain newline. Normal mode: send.
+  <C-x><C-u>     Complete slash command after a leading "/"
   <Esc>          Normal editing as usual; the buffer is a normal buffer.
 
 Window management:
@@ -35,10 +36,25 @@ Window management:
 ==============================================================================
 SLASH COMMANDS                                                *ndsh-slash*
 
-Local commands typed into the input pane. They are handled by the plugin
-and highlighted while typing; unknown slash text is sent to the runtime.
+Slash input is highlighted live while typing and completes with <C-x><C-u>.
+
+Local commands — handled by the plugin, never sent to the wire:
 
   /rename {name}     Rename the current session (shown on its winbar)
+
+Runtime commands — routed natively by the dsh SDK (unknown slash text is
+sent to the wire unchanged):
+
+  /compact           Compact the conversation context
+  /export            Export the session log
+  /feedback          Send product feedback
+  /goal {objective}  Set a session goal
+  /permission        Show or change the permission preset
+  /plan              Toggle plan mode
+
+Note: the runtime also accepts the Chinese spellings (压缩 导出 反馈 目标
+权限 计划). The list mirrors the dsh builtin set until the SDK exposes a
+catalog query.
 
 ==============================================================================
 COMMANDS                                                     *ndsh-commands*

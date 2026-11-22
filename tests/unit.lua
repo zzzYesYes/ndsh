@@ -231,6 +231,37 @@ do
   check("run handles /rename", commands.run(conv, "/rename work") and renamed == "work")
   check("run passes unknown commands through", not commands.run(conv, "/compact please"))
   check("run passes ordinary text through", not commands.run(conv, "hello /rename"))
+  check(
+    "wire commands pass through untouched",
+    not commands.run(conv, "/compact") and not commands.run(conv, "/goal finish this")
+  )
+  check(
+    "wire_names mirrors the dsh builtin set",
+    table.concat(commands.wire_names(), ",") == "compact,export,feedback,goal,permission,plan"
+  )
+  -- Completion: silent off-slash, completes after "/".
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "plain text" })
+  check("completion silent off slash", commands.complete(1, "") == -2)
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "/re" })
+  check(
+    "completion starts after the slash",
+    commands.complete(1, "re") == 0
+  )
+  local items = commands.complete(0, "re")
+  check(
+    "completion offers local command",
+    #items == 1 and items[1].word == "rename" and items[1].menu == "[local]"
+  )
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, { "/p" })
+  local words = {}
+  for _, item in ipairs(commands.complete(0, "p")) do
+    words[#words + 1] = item.word
+  end
+  table.sort(words)
+  check(
+    "completion offers wire commands",
+    table.concat(words, ",") == "permission,plan"
+  )
 end
 
 -- Spinner: a running conversation shows the animated frame in its winbar.

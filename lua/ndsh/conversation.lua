@@ -194,7 +194,8 @@ function M:open()
     self.prev_buf = wins.prev_buf
     self.prev_contentful = wins.prev_contentful or false
     self:refresh_chrome()
-    input.highlight_commands(self.input_win, require("ndsh.commands").names())
+    local commands = require("ndsh.commands")
+    input.highlight_commands(self.input_win, commands.names(), commands.wire_names())
     self:watch_windows()
   end
   self:mark_read()

@@ -19,7 +19,7 @@ local registry = {
   },
 }
 
----Registered command names, for the highlight pattern.
+---Registered LOCAL command names, for the highlight pattern.
 ---@return string[]
 function M.names()
   local names = {}
@@ -28,6 +28,42 @@ function M.names()
   end
   table.sort(names)
   return names
+end
+
+---Commands the dsh runtime routes natively (its builtin set: resolved by
+---the server's resolveCommand, which also accepts Chinese spellings).
+---They are never intercepted locally; unknown slash text reaches the wire
+---unchanged. Kept in sync manually until the SDK exposes a catalog query.
+---@return string[]
+function M.wire_names()
+  return { "compact", "export", "feedback", "goal", "permission", "plan" }
+end
+
+---Completion for the input pane (:h complete-functions). Completes local
+---and wire commands after a leading "/", stays silent otherwise.
+---@param findstart integer
+---@param base string
+---@return integer|table[]
+function M.complete(findstart, base)
+  if findstart == 1 then
+    local line = vim.api.nvim_get_current_line()
+    if not line:find("^/") then
+      return -2 -- silent: no completion outside slash command position
+    end
+    return 0 -- complete from just after the leading slash
+  end
+  local items = {}
+  for _, name in ipairs(M.names()) do
+    if name:find("^" .. vim.pesc(base)) then
+      items[#items + 1] = { word = name, menu = "[local]" }
+    end
+  end
+  for _, name in ipairs(M.wire_names()) do
+    if name:find("^" .. vim.pesc(base)) then
+      items[#items + 1] = { word = name, menu = "[dsh]" }
+    end
+  end
+  return items
 end
 
 ---Try to handle text as a local slash command.
