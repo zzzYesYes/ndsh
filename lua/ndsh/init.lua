@@ -20,7 +20,37 @@ local state = {
   seq = 0,
   activity = {}, ---@type table<string, integer> conv id -> monotonically increasing activity stamp
   activity_seq = 0,
+  --- ASCII spinner, animated while any conversation is running.
+  spinner = { idx = 1, timer = nil, frames = { "|", "/", "-", "\\" } },
 }
+
+---Advance the spinner for every running conversation; idle conversations
+---keep their static winbar. The timer runs only while something runs.
+local function update_spinner()
+  local any_running = false
+  for _, conv in ipairs(state.conversations) do
+    if conv.status == "running" then
+      any_running = true
+      break
+    end
+  end
+  local spinner = state.spinner
+  if any_running and not spinner.timer then
+    spinner.timer = vim.uv.new_timer()
+    spinner.timer:start(0, 120, vim.schedule_wrap(function()
+      spinner.idx = spinner.idx % #spinner.frames + 1
+      for _, conv in ipairs(state.conversations) do
+        if conv.status == "running" then
+          conv:refresh_chrome()
+        end
+      end
+    end))
+  elseif not any_running and spinner.timer then
+    spinner.timer:stop()
+    spinner.timer:close()
+    spinner.timer = nil
+  end
+end
 
 local function ensure_setup()
   if not state.cfg then
@@ -65,6 +95,12 @@ local function new_conversation(name)
     end,
     conn_state = function()
       return state.conn
+    end,
+    spinner_frame = function()
+      return state.spinner.frames[state.spinner.idx]
+    end,
+    status_changed = function()
+      update_spinner()
     end,
   })
   state.conversations[#state.conversations + 1] = conv

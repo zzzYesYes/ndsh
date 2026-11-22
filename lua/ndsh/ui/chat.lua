@@ -85,6 +85,7 @@ function M.create(keys, suffix)
   vim.api.nvim_set_hl(0, "NDSHToolRunning", { link = "DiagnosticWarn", default = true })
   vim.api.nvim_set_hl(0, "NDSHToolOk", { link = "DiagnosticOk", default = true })
   vim.api.nvim_set_hl(0, "NDSHToolErr", { link = "DiagnosticError", default = true })
+  vim.api.nvim_set_hl(0, "NDSHThinking", { link = "Comment", default = true })
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })
@@ -187,6 +188,27 @@ function M.tool_end(buf, id, ok, output)
   lines[#lines + 1] = ""
   append_lines(buf, lines)
   fold_range(buf, first, first + #lines - 2)
+end
+
+---Render a reasoning block: dimmed "thinking" header with the content
+---folded closed by default, expanded inline with za/<Tab>.
+---@param buf integer
+---@param text string readable reasoning text
+function M.reasoning(buf, text)
+  local s = state(buf)
+  local header_lnum = s.empty and 0 or vim.api.nvim_buf_line_count(buf)
+  append_lines(buf, { "∴ thinking" })
+  highlight_line(buf, header_lnum, "NDSHThinking")
+  local first = vim.api.nvim_buf_line_count(buf)
+  local lines = vim.split(text, "\n", { plain = true })
+  lines[#lines + 1] = ""
+  append_lines(buf, lines)
+  for lnum = first, first + #lines - 2 do
+    highlight_line(buf, lnum, "NDSHThinking")
+  end
+  -- The trailing separator line folds with the content so even a
+  -- single-line reasoning collapses to just its header.
+  fold_range(buf, first, first + #lines - 1)
 end
 
 ---Render an error block in the transcript (e.g. a failed turn's reason).

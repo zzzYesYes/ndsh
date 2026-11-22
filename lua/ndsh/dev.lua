@@ -59,7 +59,12 @@ local script = {
       data = {
         turn = 1,
         step = 1,
-        message = { content = { { type = "text", text = ASSISTANT_INTRO } } },
+        message = {
+          content = {
+            { type = "reasoning", text = "The user wants a directory listing and a code sample. `ls -la` answers the first; I'll include a small Lua snippet for the second." },
+            { type = "text", text = ASSISTANT_INTRO },
+          },
+        },
       },
     },
   },

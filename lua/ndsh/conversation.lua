@@ -34,6 +34,8 @@ local CONN_LABEL = {
 ---@field should_quit fun(): boolean close() exits nvim instead of restoring
 ---@field restore fun(survivor: integer, prev_buf: integer|nil) restore a closed takeover
 ---@field conn_state fun(): string runtime connection state
+---@field spinner_frame fun(): string current animation frame
+---@field status_changed fun() called whenever a conversation's status flips
 
 ---@param cfg table resolved ndsh config
 ---@param spec { id: string, name: string }
@@ -270,6 +272,10 @@ function M:refresh_chrome()
   if self.input_win and vim.api.nvim_win_is_valid(self.input_win) then
     local conn = self.hooks.conn_state()
     local status = conn == "ready" and self.status or (CONN_LABEL[conn] or conn)
+    if status == "running" then
+      -- Animated frame cycles while the session works.
+      status = self.hooks.spinner_frame()
+    end
     local model = self.route and self.route.model or self.cfg.dsh.model
     local right_parts = {}
     local cwd = vim.uv.cwd()
@@ -313,6 +319,7 @@ end
 function M:set_status(status)
   self.status = status
   self:refresh_chrome()
+  self.hooks.status_changed()
 end
 
 function M:rename(name)
@@ -334,11 +341,12 @@ function M:apply_op(op)
     chat.tool_begin(buf, op.id, op.name, op.summary)
   elseif op.op == "tool_end" then
     chat.tool_end(buf, op.id, op.ok, op.output)
+  elseif op.op == "reasoning" then
+    chat.reasoning(buf, op.text)
   elseif op.op == "error" then
     chat.error(buf, op.text)
   elseif op.op == "status" then
-    self.status = op.text
-    self:refresh_chrome()
+    self:set_status(op.text)
   elseif op.op == "usage" then
     self.context.used = op.input
     self:refresh_chrome()

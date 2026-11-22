@@ -81,6 +81,19 @@ check("user message rendered", chat_text():find("❯ You", 1, true) ~= nil)
 check("tool call rendered", chat_text():find("✓ bash · %{\"command\":\"echo hi\"%}") ~= nil)
 check("tool output rendered", chat_text():find("  │ fake output line 1", 1, true) ~= nil)
 
+-- Reasoning renders dimmed and folded closed by default.
+check("reasoning header rendered", chat_text():find("∴ thinking", 1, true) ~= nil)
+check("reasoning content present", chat_text():find("thinking about the right tool", 1, true) ~= nil)
+local reasoning_folded = vim.api.nvim_win_call(vim.fn.bufwinid(chat_buf), function()
+  for lnum, line in ipairs(vim.api.nvim_buf_get_lines(chat_buf, 0, -1, false)) do
+    if line:find("thinking about the right tool", 1, true) then
+      return vim.fn.foldclosed(lnum) ~= -1
+    end
+  end
+  return false
+end)
+check("reasoning content folded closed", reasoning_folded)
+
 -- Chrome: everything except the session name lives on the chat (input)
 -- pane winbar — model left, cwd and context usage right. The message pane
 -- winbar carries the session name.

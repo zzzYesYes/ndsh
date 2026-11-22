@@ -34,6 +34,26 @@ local function summarize_arguments(raw)
   return line
 end
 
+---Extract readable reasoning text from content blocks. Encrypted or empty
+---reasoning carries nothing renderable and is skipped.
+---@param content table[]|nil
+---@return string|nil
+local function reasoning_of(content)
+  if type(content) ~= "table" then
+    return nil
+  end
+  local parts = {}
+  for _, block in ipairs(content) do
+    if block.type == "reasoning" and type(block.text) == "string" and block.text:find("%S") then
+      parts[#parts + 1] = block.text
+    end
+  end
+  if #parts == 0 then
+    return nil
+  end
+  return table.concat(parts, "\n")
+end
+
 ---Project one session event into ordered writer operations.
 ---Unknown event types project to nothing.
 ---@param event table SessionEvent envelope
@@ -49,11 +69,14 @@ function M.project(event)
     return {}
   elseif t == "assistant/message" then
     local message = d.message or {}
-    local ops = {
-      { op = "begin_message", role = "assistant" },
-      { op = "append", text = text_of(message.content) },
-      { op = "end_message" },
-    }
+    local ops = {}
+    local reasoning = reasoning_of(message.content)
+    if reasoning then
+      ops[#ops + 1] = { op = "reasoning", text = reasoning }
+    end
+    ops[#ops + 1] = { op = "begin_message", role = "assistant" }
+    ops[#ops + 1] = { op = "append", text = text_of(message.content) }
+    ops[#ops + 1] = { op = "end_message" }
     if d.usage and d.usage.inputTokens then
       -- inputTokens is the request's prompt size, i.e. context fill.
       ops[#ops + 1] = { op = "usage", input = d.usage.inputTokens }

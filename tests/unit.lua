@@ -105,7 +105,10 @@ do
     type = "assistant/message",
     data = { turn = 1, step = 1, message = { content = { { type = "reasoning", text = "hidden" }, { type = "text", text = "shown" } } } },
   })
-  check("assistant text extracted, reasoning skipped", ops[2].op == "append" and ops[2].text == "shown")
+  check(
+    "assistant text extracted, reasoning becomes its own op",
+    ops[1].op == "reasoning" and ops[3].op == "append" and ops[3].text == "shown"
+  )
 
   local synthetic = projection.project({
     type = "user/message",
@@ -150,6 +153,37 @@ do
     "request/context projects route op",
     route[1].op == "route" and route[1].model == "m" and route[1].window == 128000
   )
+
+  local with_reasoning = projection.project({
+    type = "assistant/message",
+    data = {
+      turn = 1,
+      step = 1,
+      message = {
+        content = {
+          { type = "reasoning", text = "let me think" },
+          { type = "reasoning", text = "  " },
+          { type = "text", text = "answer" },
+        },
+      },
+    },
+  })
+  check(
+    "readable reasoning projects a reasoning op first",
+    with_reasoning[1].op == "reasoning"
+      and with_reasoning[1].text == "let me think"
+      and with_reasoning[2].op == "begin_message"
+  )
+
+  local encrypted_only = projection.project({
+    type = "assistant/message",
+    data = {
+      turn = 1,
+      step = 1,
+      message = { content = { { type = "reasoning", text = "" }, { type = "text", text = "answer" } } },
+    },
+  })
+  check("encrypted/empty reasoning is skipped", encrypted_only[1].op == "begin_message")
 end
 
 -- Credential store roundtrip and file permissions.
@@ -197,6 +231,39 @@ do
   check("run handles /rename", commands.run(conv, "/rename work") and renamed == "work")
   check("run passes unknown commands through", not commands.run(conv, "/compact please"))
   check("run passes ordinary text through", not commands.run(conv, "hello /rename"))
+end
+
+-- Spinner: a running conversation shows the animated frame in its winbar.
+do
+  local config = require("ndsh.config")
+  local Conversation = require("ndsh.conversation")
+  local cfg = config.resolve({ restore = "scratch" })
+  local frames = { "|", "/", "-", "\\" }
+  local frame_idx = 1
+  local conv = Conversation.new(cfg, { id = "unit-1", name = "unit" }, {
+    on_send = function() end,
+    should_quit = function() return false end,
+    restore = function() end,
+    conn_state = function()
+      return "ready"
+    end,
+    spinner_frame = function()
+      return frames[frame_idx]
+    end,
+    status_changed = function() end,
+  })
+  conv:open()
+  conv:set_status("running")
+  local winbar = vim.api.nvim_get_option_value("winbar", { win = conv.input_win })
+  check("spinner frame shown while running", winbar:find(" ndsh · |", 1, true) ~= nil)
+  frame_idx = 2
+  conv:refresh_chrome()
+  winbar = vim.api.nvim_get_option_value("winbar", { win = conv.input_win })
+  check("spinner frame advances", winbar:find(" ndsh · /", 1, true) ~= nil)
+  conv:set_status("idle")
+  winbar = vim.api.nvim_get_option_value("winbar", { win = conv.input_win })
+  check("idle restores word status", winbar:find(" ndsh · idle", 1, true) ~= nil)
+  conv:hide()
 end
 
 if failures > 0 then

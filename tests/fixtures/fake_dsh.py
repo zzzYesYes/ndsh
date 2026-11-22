@@ -51,7 +51,10 @@ def run_query(msg):
     })
     event(session_id, "assistant/message", {
         "turn": 1, "step": 1,
-        "message": {"content": text_block("FAKE-INTRO: running a tool now")},
+        "message": {"content": [
+            {"type": "reasoning", "text": "thinking about the right tool"},
+            {"type": "text", "text": "FAKE-INTRO: running a tool now"},
+        ]},
         "usage": {"inputTokens": 12345, "outputTokens": 42},
     })
 
