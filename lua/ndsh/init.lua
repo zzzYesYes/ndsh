@@ -5,6 +5,7 @@ local config = require("ndsh.config")
 local Runtime = require("ndsh.runtime")
 local Conversation = require("ndsh.conversation")
 local commands = require("ndsh.commands")
+local persist = require("ndsh.persist")
 local prompts = require("ndsh.ui.prompts")
 local sessions_ui = require("ndsh.ui.sessions")
 
@@ -62,16 +63,39 @@ end
 local function touch(conv)
   state.activity_seq = state.activity_seq + 1
   state.activity[conv.id] = state.activity_seq
+  conv.last_active = os.time()
 end
 
----Create and register a conversation.
+---Persist the registry (create/rename/delete/activate; not every touch).
+local function persist_save()
+  if not state.cfg.persist_sessions then
+    return
+  end
+  local entries = {}
+  for _, conv in ipairs(state.conversations) do
+    entries[#entries + 1] = {
+      id = conv.id,
+      name = conv.name,
+      created = conv.created,
+      last_active = conv.last_active or conv.created,
+    }
+  end
+  persist.save(state.cfg, entries)
+end
+
+---Create and register a conversation. With `stored`, restores a persisted
+---entry as detached: its original wire id is the resume address.
 ---@param name string|nil
+---@param stored table|nil NdsStoredSession
 ---@return table conv
-local function new_conversation(name)
+local function new_conversation(name, stored)
   state.seq = state.seq + 1
+  if not stored then
+    state.live_seq = (state.live_seq or 0) + 1
+  end
   local conv = Conversation.new(state.cfg, {
-    id = ("ndsh-%d-%d"):format(state.seq, math.random(100000)),
-    name = name or ("chat " .. state.seq),
+    id = stored and stored.id or ("ndsh-%d-%d"):format(state.seq, math.random(100000)),
+    name = name or (stored and stored.name) or ("chat " .. state.live_seq),
   }, {
     on_send = function(c, text)
       M._on_send(c, text)
@@ -103,9 +127,15 @@ local function new_conversation(name)
       update_spinner()
     end,
   })
+  conv.created = stored and stored.created or os.time()
+  conv.last_active = stored and stored.last_active or conv.created
+  conv.resume_state = stored and "detached" or "live"
   state.conversations[#state.conversations + 1] = conv
   state.by_id[conv.id] = conv
   touch(conv)
+  if not stored then
+    persist_save()
+  end
   return conv
 end
 
@@ -141,6 +171,13 @@ function M.setup(opts)
     if current then
       state.cfg.dsh.provider = current.provider
       state.cfg.dsh.model = current.model
+    end
+  end
+  -- Restore persisted conversations as detached entries (once per process).
+  if state.cfg.persist_sessions and not state.restored then
+    state.restored = true
+    for _, stored in ipairs(persist.load(state.cfg)) do
+      new_conversation(nil, stored)
     end
   end
   local function map(key, fn, desc)
@@ -207,14 +244,45 @@ function M.new_session(name)
   return conv
 end
 
+---Resume a detached conversation's wire session. On rejection the session
+---continues fresh under the same name with a new wire id; on success the
+---runtime reattaches with the model-side context intact (the transcript
+---starts empty — no history read on the wire yet).
+---@param conv table
+local function resume_conversation(conv)
+  M._ensure_runtime()
+  conv.resume_state = "resuming"
+  state.runtime:resume(conv.id, function(_, err)
+    if err then
+      state.by_id[conv.id] = nil
+      conv.id = ("ndsh-%d-%d"):format(state.seq, math.random(100000))
+      state.by_id[conv.id] = conv
+      conv.resume_state = "live"
+      conv:apply_op({ op = "notice", text = "previous session could not be resumed; starting fresh" })
+      persist_save()
+      conv:refresh_chrome()
+      vim.notify(("ndsh: could not resume %q; starting fresh"):format(conv.name), vim.log.levels.WARN)
+      return
+    end
+    conv.resume_state = "live"
+    conv:apply_op({ op = "notice", text = "session resumed — the agent remembers; the transcript starts here" })
+    persist_save()
+    conv:refresh_chrome()
+  end)
+end
+
 ---Jump to a conversation in the panel (:NDSHSessions selection).
 ---@param conv table
 local function goto_conversation(conv)
+  if conv.resume_state == "detached" then
+    resume_conversation(conv)
+  end
   show_conversation(conv)
   conv:mark_read()
   if conv:is_open() then
     vim.fn.win_gotoid(conv.chat_win)
   end
+  persist_save()
 end
 
 ---Session navigator (:NDSHSessions), most recently active first.
@@ -243,14 +311,74 @@ function M.rename(name)
   if name and name ~= "" then
     conv:rename(name)
     touch(conv)
+    persist_save()
     return
   end
   vim.ui.input({ prompt = "Session name: ", default = conv.name }, function(text)
     if text and text ~= "" then
       conv:rename(text)
       touch(conv)
+      persist_save()
     end
   end)
+end
+
+---Delete a conversation (:NDSHDelete): confirm, then remove it from the
+---registry, wipe its transcript buffers, and drop its persisted record.
+---The wire session keeps running in the runtime until the next restart —
+---the SDK has no session/close (see docs/upstream-sdk-plan.md).
+---@param target table|nil defaults to the active conversation
+function M.delete_session(target)
+  ensure_setup()
+  local conv = target or state.active
+  if not conv then
+    vim.notify("ndsh: no session to delete", vim.log.levels.WARN)
+    return
+  end
+  vim.ui.select({ "Delete", "Cancel" }, {
+    prompt = ("ndsh: delete session %q? The transcript cannot be recovered."):format(conv.name),
+  }, function(choice)
+    if choice ~= "Delete" then
+      return
+    end
+    M._delete_conversation(conv)
+  end)
+end
+
+---@param conv table
+function M._delete_conversation(conv)
+  if conv:is_open() then
+    conv:hide()
+  end
+  for _, buf in ipairs({ conv.chat_buf, conv.input_buf }) do
+    if buf and vim.api.nvim_buf_is_valid(buf) then
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+  end
+  state.by_id[conv.id] = nil
+  state.activity[conv.id] = nil
+  for i, c in ipairs(state.conversations) do
+    if c == conv then
+      table.remove(state.conversations, i)
+      break
+    end
+  end
+  if state.active == conv then
+    state.active = nil
+    -- Fall back to the most recently active remaining conversation.
+    local best, best_stamp = nil, -1
+    for _, c in ipairs(state.conversations) do
+      local stamp = state.activity[c.id] or 0
+      if stamp > best_stamp then
+        best, best_stamp = c, stamp
+      end
+    end
+    if best then
+      goto_conversation(best)
+    end
+  end
+  persist_save()
+  vim.notify(("ndsh: session %q deleted"):format(conv.name), vim.log.levels.INFO)
 end
 
 ---Echo input locally, then send it on the conversation's wire session.

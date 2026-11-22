@@ -211,6 +211,16 @@ function M.reasoning(buf, text)
   fold_range(buf, first, first + #lines - 1)
 end
 
+---Render a dim one-line notice in the transcript (e.g. "session resumed").
+---@param buf integer
+---@param text string
+function M.notice(buf, text)
+  local s = state(buf)
+  local lnum = s.empty and 0 or vim.api.nvim_buf_line_count(buf)
+  append_lines(buf, { "─ " .. text .. " ─", "" })
+  highlight_line(buf, lnum, "NDSHAssistantHeader")
+end
+
 ---Render an error block in the transcript (e.g. a failed turn's reason).
 ---@param buf integer
 ---@param text string

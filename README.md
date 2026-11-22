@@ -35,6 +35,7 @@ and intentionally not pinned down there).
 | `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
 | `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
+| `:NDSHDelete` | Delete the current session (with confirmation) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
 | `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
@@ -54,6 +55,21 @@ detaches the session — transcripts persist and `<leader>ans` brings it back.
 All sessions share the runtime's provider/model (an SDK limitation; see
 docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
 current session locally; other slash commands pass through to the runtime.
+
+## Persistence and resume
+
+The registry persists to `sessions.json` beside the store, so sessions
+survive nvim restarts (`persist_sessions = true` by default). Restored
+sessions appear in the navigator as detached entries; activating one calls
+`session/resume` on the wire and the agent continues with its full context
+— the transcript pane starts empty with a "session resumed" notice (no
+history read on the wire yet; see docs/upstream-sdk-plan.md). If a stored
+session can't be resumed (store wiped, format changed), it starts fresh
+under the same name.
+
+`:NDSHDelete` removes the active session after confirmation — registry,
+transcript buffers, and store record. The wire session keeps running in
+the runtime until its next restart; the SDK has no session/close yet.
 
 Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
 panel takes the whole tab like a full-screen TUI session; with code buffers

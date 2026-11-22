@@ -37,6 +37,9 @@ M.defaults = {
   --- stdpath("data")/ndsh/credentials.json. Tests and isolated setups
   --- point this elsewhere.
   store_path = nil, ---@type string|nil
+  --- Persist the session registry (sessions.json beside the store) so
+  --- conversations resume after nvim restarts.
+  persist_sessions = true,
   --- dsh runtime connection.
   dsh = {
     --- Explicit runtime argv; nil resolves an installed `dsh`, then the

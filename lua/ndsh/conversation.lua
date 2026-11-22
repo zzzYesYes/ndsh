@@ -346,6 +346,8 @@ function M:apply_op(op)
     chat.reasoning(buf, op.text)
   elseif op.op == "error" then
     chat.error(buf, op.text)
+  elseif op.op == "notice" then
+    chat.notice(buf, op.text)
   elseif op.op == "status" then
     self:set_status(op.text)
   elseif op.op == "usage" then

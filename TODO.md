@@ -2,19 +2,15 @@
 
 Next steps for ndsh, roughly in priority order.
 
-## M4: session persistence + resume
+## Done: M4 session persistence + resume + deletion
 
-Persist the conversation registry (id, name, provider/model, cwd) in the
-store. On nvim start, offer to reattach sessions via `session/resume`;
-activating a stored session resumes its wire session on the runtime.
-Known caveat: without a history-read method on the SDK wire, the transcript
-starts empty with a "session resumed" notice (history read is wishlist #2
-in docs/upstream-sdk-plan.md).
+Registry persists to sessions.json; stored sessions restore detached and
+resume on activation (`session/resume`); `:NDSHDelete` removes sessions
+after confirmation. Remaining wire gaps are upstream items 2 and 6 in
+docs/upstream-sdk-plan.md.
 
 ## Rendering
 
-- **Reasoning blocks**: render assistant thinking as dimmed, collapsible
-  sections (currently skipped by the projection).
 - **Richer approval cards**: show tool arguments (and diffs for file
   edits) in the approval prompt before allowing.
 - **Multi-select user questions**: toggle several options for
@@ -23,7 +19,6 @@ in docs/upstream-sdk-plan.md).
 ## UX polish
 
 - **Auto-title sessions** from the first prompt instead of `chat N`.
-- **Spinner** in the input winbar while a session is running.
 - **Telescope preview** of the transcript tail in the session navigator.
 
 ## Upstream (fork of deepseek-harness)
@@ -37,6 +32,9 @@ Per docs/upstream-sdk-plan.md, in priority order:
 3. Token-level streaming notification — unblocks typewriter rendering;
    the chat writer's incremental `append()` path is ready for it.
 4. Model catalog query — unblocks live model discovery in `:NDSHModel`.
+5. Command catalog — upstream PR to mount the full builtin set in the sdk
+   profile, or a profile patch today.
+6. `session/close` + `session/delete` — real deletion, not just detach.
 
 ## Ops
 

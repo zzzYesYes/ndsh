@@ -64,6 +64,7 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHNew [name]    Create a session and swap the panel to it
   :NDSHSessions      Session navigator (telescope or vim.ui picker)
   :NDSHRename [name] Rename the current session
+  :NDSHDelete        Delete the current session (asks for confirmation)
   :NDSHConnect       Connect a provider (stores credentials)
   :NDSHModel         Select the active model (restarts the runtime)
   :NDSHStop          Stop the runtime
@@ -96,5 +97,9 @@ The message pane winbar shows the session name (● marks unread activity).
 The input pane winbar shows agent status (an ASCII spinner while running),
 the active model on the left, and the working directory with context usage
 (used/window · %) on the right.
+
+Sessions persist across nvim restarts (sessions.json beside the store);
+activating a stored session resumes its wire session, and the transcript
+restarts with a "session resumed" notice.
 
  vim:tw=78:ts=8:ft=help:norl:

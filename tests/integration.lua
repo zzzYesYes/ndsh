@@ -23,8 +23,11 @@ vim.ui.select = function(items, _, on_choice)
 end
 
 local function find_chat_buf()
+  -- With several conversations, only the visible one has a window.
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "ndsh" then
+    if vim.api.nvim_get_option_value("filetype", { buf = buf }) == "ndsh"
+      and vim.fn.bufwinid(buf) ~= -1
+    then
       return buf
     end
   end
@@ -41,8 +44,20 @@ local function has_status(win, status)
 end
 
 local ndsh = require("ndsh")
+
+-- Seed a persisted session from a previous "process".
+local store_dir = vim.fn.tempname()
+vim.fn.mkdir(store_dir, "p")
+vim.fn.writefile(
+  { vim.json.encode({
+    sessions = { { id = "persisted-1", name = "old chat", created = 1000, last_active = 1000 } },
+  }) },
+  store_dir .. "/sessions.json"
+)
+
 ndsh.setup({
   restore = "scratch",
+  store_path = store_dir .. "/credentials.json",
   dsh = {
     auto_connect = true,
     cmd = { "python3", vim.fn.getcwd() .. "/tests/fixtures/fake_dsh.py" },
@@ -212,6 +227,49 @@ end
 ndsh.sessions()
 check("navigator swaps back to chat 1", vim.fn.bufwinid(chat_buf) ~= -1)
 check("chat 1 transcript survived the swap", chat_text():find("integration hello", 1, true) ~= nil)
+
+-- 6b. Persistence: a stored session restores detached and resumes on
+-- activation; deletion removes it everywhere.
+vim.ui.select = function(items, _, on_choice)
+  for i, item in ipairs(items) do
+    if item.name == "old chat" then
+      on_choice(item, i)
+      return
+    end
+  end
+  on_choice(nil, nil)
+end
+ndsh.sessions()
+local old_buf
+for _, b in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.api.nvim_buf_get_name(b):find("ndsh://chat/persisted%-1") then
+    old_buf = b
+  end
+end
+check("stored session restored with its buffer", old_buf ~= nil)
+local function old_text()
+  return table.concat(vim.api.nvim_buf_get_lines(old_buf, 0, -1, false), "\n")
+end
+local resumed = vim.wait(10000, function()
+  return old_text():find("session resumed", 1, true) ~= nil
+end, 100)
+check("activation resumes the wire session (notice)", resumed)
+ndsh._on_send("resumed talk")
+local served = vim.wait(10000, function()
+  return old_text():find("FAKE%-OUTRO: resumed talk") ~= nil
+end, 100)
+check("resumed session serves prompts", served)
+
+vim.ui.select = function(_, _, on_choice)
+  on_choice("Delete", 1)
+end
+ndsh.delete_session()
+check("delete wipes the transcript buffer", not vim.api.nvim_buf_is_valid(old_buf))
+check(
+  "store drops the deleted session",
+  not table.concat(vim.fn.readfile(store_dir .. "/sessions.json"), "\n"):find("old chat", 1, true)
+)
+check("panel falls back to a remaining session", ndsh.is_open())
 
 -- 7. Graceful stop: no error state, winbar shows stopped.
 ndsh.stop_session()

@@ -294,6 +294,23 @@ do
   conv:hide()
 end
 
+-- Session registry persistence roundtrip.
+do
+  local persist = require("ndsh.persist")
+  local config = require("ndsh.config")
+  local dir = vim.fn.tempname()
+  local cfg = config.resolve({ store_path = dir .. "/credentials.json" })
+  persist.save(cfg, { { id = "wire-1", name = "old chat", created = 100, last_active = 200 } })
+  local loaded = persist.load(cfg)
+  check(
+    "persist roundtrip",
+    #loaded == 1 and loaded[1].id == "wire-1" and loaded[1].name == "old chat" and loaded[1].last_active == 200
+  )
+  local empty = persist.load(config.resolve({ store_path = vim.fn.tempname() .. "/c.json" }))
+  check("persist empty when file missing", #empty == 0)
+  vim.fn.delete(dir, "rf")
+end
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")

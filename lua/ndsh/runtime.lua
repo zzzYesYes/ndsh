@@ -51,6 +51,7 @@ function M.new(cfg, cb)
     cb = cb,
     state = "stopped",
     queue = {}, ---@type { session_id: string, text: string }[] prompts before ready
+    resume_queue = {}, ---@type { session_id: string, cb: function }[] resumes before ready
     log = {}, ---@type string[] stderr ring buffer for :NDSHLog
     job = nil,
     protocol = nil,
@@ -178,6 +179,11 @@ function M:start()
     for _, item in ipairs(queue) do
       self:send(item.session_id, item.text)
     end
+    local resumes = self.resume_queue
+    self.resume_queue = {}
+    for _, item in ipairs(resumes) do
+      self:resume(item.session_id, item.cb)
+    end
   end)
 end
 
@@ -207,6 +213,18 @@ end
 ---@return string[]
 function M:logs()
   return self.log
+end
+
+---Resume a persisted session on the wire. Queues until the runtime is
+---ready, like send(). cb receives (result, err).
+---@param session_id string
+---@param cb fun(result: any, err: table|nil)
+function M:resume(session_id, cb)
+  if self.state ~= "ready" then
+    self.resume_queue[#self.resume_queue + 1] = { session_id = session_id, cb = cb }
+    return
+  end
+  self.protocol:request("session/resume", { sessionId = session_id }, cb)
 end
 
 function M:stop()

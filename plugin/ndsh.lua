@@ -50,3 +50,7 @@ end, { desc = "Navigate ndsh sessions" })
 vim.api.nvim_create_user_command("NDSHRename", function(args)
   require("ndsh").rename(args.args ~= "" and args.args or nil)
 end, { desc = "Rename the current session", nargs = "?" })
+
+vim.api.nvim_create_user_command("NDSHDelete", function()
+  require("ndsh").delete_session()
+end, { desc = "Delete the current session" })

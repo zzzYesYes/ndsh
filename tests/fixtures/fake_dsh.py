@@ -121,6 +121,12 @@ def main():
         elif method == "session/query":
             time.sleep(0.05)
             run_query(msg)
+        elif method == "session/resume":
+            sid = msg["params"]["sessionId"]
+            if sid.startswith("persisted-"):
+                send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
+            else:
+                send({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32602, "message": "unknown session"}})
         elif method == "shutdown":
             send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
             return

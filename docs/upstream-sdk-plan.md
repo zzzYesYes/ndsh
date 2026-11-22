@@ -46,6 +46,11 @@ SDK, and the wire docs in the same PR.
    - **Discovery**: whichever way, a catalog query (`commands/list`) lets
      clients stop mirroring the command set by hand — ndsh currently
      hardcodes {compact, goal, plan} for highlight and completion.
+6. **Session lifecycle on the wire.** The SDK has `session/resume` but no
+   `session/close` or `session/delete`, so deleting a session client-side
+   leaves the wire agent running until the next runtime restart and leaves
+   dsh's persisted store entry on disk. Add both methods so "delete" can
+   mean "really gone" — belongs in the same fork PR family as item 5.
 
 ## Until then
 
