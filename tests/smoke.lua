@@ -21,6 +21,12 @@ end
 
 local ndsh = require("ndsh")
 
+-- No dsh runtime exists in the test environment, so opening the panel
+-- triggers the managed-bootstrap offer; decline it without blocking.
+vim.ui.select = function(_, _, cb)
+  cb(nil)
+end
+
 -- 1. Takeover layout: a fresh headless nvim has one empty window.
 -- auto_connect off: the frame smoke must not spawn a real runtime.
 ndsh.setup({ restore = "scratch", dsh = { auto_connect = false } })

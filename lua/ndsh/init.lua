@@ -427,6 +427,18 @@ function M._ensure_runtime()
     end
     return
   end
+  -- No runtime resolvable anywhere: offer the managed bootstrap once, then
+  -- retry. Declining falls through on the next call and reports the plain
+  -- "no dsh executable" error pointing at :NDSHInstallRuntime.
+  if not Runtime.resolve_cmd(state.cfg) and not state.bootstrap_offered then
+    state.bootstrap_offered = true
+    require("ndsh.bootstrap").ensure(state.cfg, function(ok)
+      if ok then
+        M._ensure_runtime()
+      end
+    end)
+    return
+  end
   state.runtime = Runtime.new(state.cfg, {
     on_event = function(session_id, event)
       M._route_event(session_id, event)
@@ -478,6 +490,19 @@ function M.restart_session()
   else
     M._ensure_runtime()
   end
+end
+
+---Install the managed runtime (:NDSHInstallRuntime): a pinned Node.js +
+---@deepseek-ai/dsh under stdpath("data")/ndsh/bootstrap, then connect.
+function M.install_runtime()
+  ensure_setup()
+  require("ndsh.bootstrap").install(state.cfg, function(ok, err)
+    if ok then
+      M.restart_session()
+    else
+      vim.notify("ndsh: runtime install failed: " .. tostring(err), vim.log.levels.ERROR)
+    end
+  end)
 end
 
 ---Interactive provider connection (:NDSHConnect): pick a provider, enter

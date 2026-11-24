@@ -14,8 +14,21 @@ under `nvim -u NONE` to prove this stays true.
 
 | Dependency | Purpose | Resolution |
 |---|---|---|
-| `dsh` executable | the agent runtime (`dsh --profile sdk`) | `dsh.cmd` config, else `$PATH`, else `~/workspace/deepseek-harness` via pnpm |
+| `dsh` executable | the agent runtime (`dsh --profile sdk`) | `dsh.cmd` config, else `$PATH`, else the managed bootstrap runtime, else `~/workspace/deepseek-harness` via pnpm |
 | node + pnpm | only for the source-checkout launch path | `~/.local/share/pnpm/bin/pnpm` fallback |
+
+## Managed bootstrap (`:NDSHInstallRuntime`)
+
+With no `dsh` resolvable, first use offers to download a pinned Node.js
+(`dsh.node_version`) and install a pinned `@deepseek-ai/dsh` (`dsh.version`)
+into `stdpath("data")/ndsh/bootstrap`. Only stock Unix tools are needed;
+nothing touches system paths or requires Node preinstalled.
+
+| Tool | Purpose |
+|---|---|
+| `curl` | downloads the Node.js tarball and SHASUMS256.txt |
+| `tar` (+ gzip) | extracts the Node.js distribution |
+| `sha256sum` / `shasum` | verifies the tarball against SHASUMS256.txt (fail closed) |
 
 ## Test-only dependencies
 

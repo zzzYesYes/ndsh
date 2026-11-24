@@ -7,16 +7,21 @@ local Protocol = require("ndsh.protocol")
 local M = {}
 M.__index = M
 
----Resolve the runtime argv: explicit dsh.cmd, an installed dsh, or the
----source checkout used for development.
+---Resolve the runtime argv: explicit dsh.cmd, an installed dsh, the managed
+---bootstrap runtime (:NDSHInstallRuntime), or the source checkout used for
+---development.
 ---@param cfg table
 ---@return string[]|nil cmd, string|nil err
-local function resolve_cmd(cfg)
+function M.resolve_cmd(cfg)
   if cfg.dsh.cmd then
     return cfg.dsh.cmd
   end
   if vim.fn.exepath("dsh") ~= "" then
     return { "dsh", "--profile", cfg.dsh.profile }
+  end
+  local managed = require("ndsh.bootstrap").runtime_cmd(cfg)
+  if managed then
+    return managed
   end
   local checkout = vim.fn.expand("~/workspace/deepseek-harness")
   if vim.fn.isdirectory(checkout) == 1 then
@@ -32,7 +37,7 @@ local function resolve_cmd(cfg)
       return { pnpm, "-C", checkout, "dsh", "--profile", cfg.dsh.profile }
     end
   end
-  return nil, "no dsh executable found; set dsh.cmd in setup()"
+  return nil, "no dsh executable found; set dsh.cmd in setup() or run :NDSHInstallRuntime"
 end
 
 ---@class NdsRuntimeCallbacks
@@ -97,7 +102,7 @@ function M:start()
   if self.state == "starting" or self.state == "ready" then
     return
   end
-  local cmd, err = resolve_cmd(self.cfg)
+  local cmd, err = M.resolve_cmd(self.cfg)
   if not cmd then
     set_state(self, "error")
     self.cb.on_notify("ndsh: " .. err, vim.log.levels.ERROR)

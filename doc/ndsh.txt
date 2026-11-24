@@ -69,6 +69,8 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHModel         Select the active model (restarts the runtime)
   :NDSHStop          Stop the runtime
   :NDSHRestart       Restart the runtime
+  :NDSHInstallRuntime  Install the managed runtime: a pinned Node.js +
+                     @deepseek-ai/dsh under stdpath("data")/ndsh/bootstrap
   :NDSHLog           Show the captured runtime stderr log
   :NDSHDemo          Play a scripted demo session
 
@@ -80,6 +82,14 @@ setup({}) accepts, among others:
   input_height      input pane rows
   restore           "quit" | "dashboard" | "scratch" | fun(win)
   store_path        credentials/session store location
+  dsh.version       pinned @deepseek-ai/dsh version for the managed runtime
+  dsh.node_version  pinned Node.js release for the managed runtime
+
+                                                          *ndsh-runtime*
+Runtime argv resolution order: dsh.cmd, `dsh` on $PATH, the managed
+bootstrap runtime, then a ~/workspace/deepseek-harness source checkout.
+With nothing resolvable, first use offers to bootstrap the managed runtime
+(needs curl, tar, sha256sum); :NDSHInstallRuntime repeats or repairs it.
 
                                                           *ndsh-config-keys*
 Key mappings are fields under keys = {} and are intentionally user-owned:

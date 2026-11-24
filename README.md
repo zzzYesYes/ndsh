@@ -9,9 +9,24 @@ buffers. Approvals and user questions are answered through `vim.ui`.
 Status: milestone 2 done — panel frame plus a live SDK backend verified
 against a scripted fixture runtime and a real `dsh` process.
 
-## Install (development)
+## Install
 
-Add this directory to your `runtimepath`, e.g. with lazy.nvim:
+With lazy.nvim:
+
+```lua
+{
+  "zzzYesYes/ndsh",
+  dependencies = { "nvim-telescope/telescope.nvim" }, -- optional, better session picker
+  opts = {},
+}
+```
+
+On first run with no `dsh` available, ndsh offers to bootstrap a managed
+runtime itself: a pinned Node.js plus `@deepseek-ai/dsh` downloaded into
+`stdpath("data")/ndsh/bootstrap` (needs only `curl`, `tar`, and
+`sha256sum`; see `:NDSHInstallRuntime`). No manual installs required.
+
+For development, point at a local checkout instead:
 
 ```lua
 { dir = "~/workspace/ndsh", opts = {} }
@@ -38,6 +53,7 @@ and intentionally not pinned down there).
 | `:NDSHDelete` | Delete the current session (with confirmation) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
+| `:NDSHInstallRuntime` | Install the managed runtime (pinned Node.js + `@deepseek-ai/dsh`) |
 | `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
 | `:NDSHModel` | Select the active model (persists; restarts the runtime) |
 | `:NDSHLog` | Show the captured runtime stderr log |
@@ -95,8 +111,12 @@ panel.
 ## Runtime connection
 
 The runtime connects when the panel opens (`dsh.auto_connect`). `dsh.cmd`
-sets the argv explicitly; otherwise an installed `dsh` is used, falling back
-to a `~/workspace/deepseek-harness` source checkout via pnpm. Provider and
+sets the argv explicitly; otherwise an installed `dsh` is used, then the
+managed bootstrap runtime, then a `~/workspace/deepseek-harness` source
+checkout via pnpm. With nothing resolvable, first use offers to download a
+pinned Node.js (`dsh.node_version`) and `@deepseek-ai/dsh` (`dsh.version`)
+into `stdpath("data")/ndsh/bootstrap`; `:NDSHInstallRuntime` repeats or
+repairs that install. Provider and
 model default to `deepseek-official` / `deepseek-v4-flash` and are
 configurable. Credentials: run `:NDSHConnect` to pick a provider, enter its
 API key and model — they are stored owner-only at

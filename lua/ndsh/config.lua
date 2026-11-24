@@ -43,12 +43,18 @@ M.defaults = {
   --- dsh runtime connection.
   dsh = {
     --- Explicit runtime argv; nil resolves an installed `dsh`, then the
-    --- ~/workspace/deepseek-harness source checkout via pnpm.
+    --- managed bootstrap runtime, then the ~/workspace/deepseek-harness
+    --- source checkout via pnpm.
     cmd = nil, ---@type string[]|nil
     profile = "sdk",
     --- Connect at plugin load (and when the panel opens); false connects
     --- only on :NDSHRestart.
     auto_connect = true,
+    --- Pins for the managed bootstrap runtime (:NDSHInstallRuntime): the
+    --- @deepseek-ai/dsh npm version and the Node.js release that runs it.
+    --- Bump together when the wire protocol moves.
+    version = "0.2.2-rc.5",
+    node_version = "26.13.1",
     provider = "deepseek-official",
     model = "deepseek-v4-flash",
     --- Extra routes offered by :NDSHModel, e.g.
