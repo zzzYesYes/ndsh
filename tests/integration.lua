@@ -50,7 +50,7 @@ local store_dir = vim.fn.tempname()
 vim.fn.mkdir(store_dir, "p")
 vim.fn.writefile(
   { vim.json.encode({
-    sessions = { { id = "persisted-1", name = "old chat", created = 1000, last_active = 1000 } },
+    sessions = { { id = "persisted-1", name = "old chat", created = 1000, last_active = 1000, plan_active = true } },
   }) },
   store_dir .. "/sessions.json"
 )
@@ -228,6 +228,23 @@ ndsh.sessions()
 check("navigator swaps back to chat 1", vim.fn.bufwinid(chat_buf) ~= -1)
 check("chat 1 transcript survived the swap", chat_text():find("integration hello", 1, true) ~= nil)
 
+-- 6c. Plan/build mode from the wire drives the input pane winbar (the
+-- winbar option holds statusline syntax, so the mode group names match).
+check(
+  "winbar defaults to build mode",
+  winbar_text(vim.fn.bufwinid(input1_buf)):find("NDSHModeBuild", 1, true) ~= nil
+)
+ndsh._on_send("/plan")
+local plan_on = vim.wait(10000, function()
+  return winbar_text(vim.fn.bufwinid(input1_buf)):find("NDSHModePlan", 1, true) ~= nil
+end, 100)
+check("winbar shows plan mode after /plan", plan_on)
+ndsh._on_send("/plan off")
+local plan_off = vim.wait(10000, function()
+  return winbar_text(vim.fn.bufwinid(input1_buf)):find("NDSHModeBuild", 1, true) ~= nil
+end, 100)
+check("winbar returns to build after /plan off", plan_off)
+
 -- 6b. Persistence: a stored session restores detached and resumes on
 -- activation; deletion removes it everywhere.
 vim.ui.select = function(items, _, on_choice)
@@ -254,6 +271,16 @@ local resumed = vim.wait(10000, function()
   return old_text():find("session resumed", 1, true) ~= nil
 end, 100)
 check("activation resumes the wire session (notice)", resumed)
+local old_input_win
+for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+  if vim.api.nvim_win_get_buf(win) ~= old_buf then
+    old_input_win = win
+  end
+end
+check(
+  "restored session keeps its last known mode",
+  old_input_win ~= nil and winbar_text(old_input_win):find("NDSHModePlan", 1, true) ~= nil
+)
 ndsh._on_send("resumed talk")
 local served = vim.wait(10000, function()
   return old_text():find("FAKE%-OUTRO: resumed talk") ~= nil

@@ -99,6 +99,9 @@ function M.project(event)
     }
   elseif t == "turn/start" then
     return { { op = "status", text = "running" } }
+  elseif t == "plan/mode" then
+    -- Plan-mode toggle (e.g. /plan): winbar chrome only, no transcript noise.
+    return { { op = "mode", active = d.active == true } }
   elseif t == "turn/end" then
     local ops = { { op = "status", text = "idle" } }
     -- A failed turn commits no messages; surface the reason visibly.

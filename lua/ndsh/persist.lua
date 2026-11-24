@@ -25,6 +25,7 @@ end
 ---@field created integer epoch seconds
 ---@field last_active integer epoch seconds
 ---@field cwd string|nil working directory the wire session lives in
+---@field plan_active boolean|nil last known plan-mode state (nil: unknown)
 
 ---@param cfg table
 ---@return NdsStoredSession[]

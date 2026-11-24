@@ -103,8 +103,10 @@ last file window (`restore = "quit"`, the default); alternatives are
 
 The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
 native. The chat (input) pane's winbar carries all chrome: agent status and
-active model on the left, session working directory and live context usage
-right-aligned (`~/proj · 12k/128k · 10%`), fed by `request/context` capacity
+active model on the left; right-aligned the plan/build mode (colored,
+following `/plan` toggles via `plan/mode` events, persisted per session),
+session working directory, and live context usage
+(`plan · ~/proj · 12k/128k · 10%`), fed by `request/context` capacity
 events and per-message token usage. The message pane stays decoration-free
 and both panes keep normal vim statuslines. Chat buffer locals: `q` closes, `i`
 jumps to input, `<Tab>` toggles tool-result folds. Input: `<C-s>` sends

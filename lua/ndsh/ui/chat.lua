@@ -86,6 +86,8 @@ function M.create(keys, suffix)
   vim.api.nvim_set_hl(0, "NDSHToolOk", { link = "DiagnosticOk", default = true })
   vim.api.nvim_set_hl(0, "NDSHToolErr", { link = "DiagnosticError", default = true })
   vim.api.nvim_set_hl(0, "NDSHThinking", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "NDSHModePlan", { link = "DiagnosticWarn", default = true })
+  vim.api.nvim_set_hl(0, "NDSHModeBuild", { link = "Comment", default = true })
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = buf })

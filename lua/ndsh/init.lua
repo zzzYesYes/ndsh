@@ -80,6 +80,7 @@ local function persist_save()
       created = conv.created,
       last_active = conv.last_active or conv.created,
       cwd = conv.cwd,
+      plan_active = conv.plan_active,
     }
   end
   persist.save(state.cfg, entries)
@@ -162,6 +163,9 @@ local function new_conversation(name, stored)
   conv.created = stored and stored.created or os.time()
   conv.last_active = stored and stored.last_active or conv.created
   conv.cwd = stored and stored.cwd or vim.uv.cwd()
+  if stored then
+    conv.plan_active = stored.plan_active
+  end
   conv.resume_state = stored and "detached" or "live"
   state.conversations[#state.conversations + 1] = conv
   state.by_id[conv.id] = conv

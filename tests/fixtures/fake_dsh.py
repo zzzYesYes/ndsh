@@ -49,6 +49,8 @@ def run_query(msg):
     event(session_id, "request/context", {
         "provider": "fake", "model": "fake-v1", "contextWindow": 128000,
     })
+    if text.startswith("/plan"):
+        event(session_id, "plan/mode", {"active": text.strip() != "/plan off"})
     event(session_id, "assistant/message", {
         "turn": 1, "step": 1,
         "message": {"content": [

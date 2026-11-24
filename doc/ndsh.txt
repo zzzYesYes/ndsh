@@ -110,8 +110,9 @@ CHROME                                                          *ndsh-chrome*
 
 The message pane winbar shows the session name (● marks unread activity).
 The input pane winbar shows agent status (an ASCII spinner while running),
-the active model on the left, and the working directory with context usage
-(used/window · %) on the right.
+the active model on the left, and on the right the plan/build mode
+(colored; follows /plan toggles via plan/mode events), the working
+directory, and context usage (used/window · %).
 
 Sessions persist across nvim restarts (sessions.json beside the store), and
 each session's transcript is saved beside it (transcripts/<id>.md) and

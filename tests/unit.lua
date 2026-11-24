@@ -131,6 +131,9 @@ do
   })
   check("tool call summary is one line", call[1].summary == '{ "command": "ls" }')
 
+  local mode = projection.project({ type = "plan/mode", data = { active = true } })
+  check("plan/mode projects a mode op", #mode == 1 and mode[1].op == "mode" and mode[1].active == true)
+
   local with_usage = projection.project({
     type = "assistant/message",
     data = {
