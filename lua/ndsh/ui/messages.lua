@@ -99,9 +99,9 @@ function M.scan(buf)
 end
 
 ---Jump to the next/previous transcript block relative to the cursor in the
----window showing buf. User and assistant entries land on their header; tool
----entries land on the first output line with the fold opened (zv), so the
----output is visible. Wraps at both ends.
+---window showing buf, one way only — no wrap at the ends. Forward lands a
+---tool block on its first folded output line (opened with zv); backward
+---always lands on block headers, so backing out of an output never stalls.
 ---@param buf integer chat buffer
 ---@param dir integer 1 forward, -1 backward
 ---@param count integer blocks to move
@@ -126,22 +126,31 @@ function M.goto_block(buf, dir, count)
           return e
         end
       end
-      return entries[1]
+      return nil
     end
     for i = #entries, 1, -1 do
       if entries[i].lnum < line then
         return entries[i]
       end
     end
-    return entries[#entries]
+    return nil
   end
-  local entry = step(vim.api.nvim_win_get_cursor(win)[1])
+  -- Forward lands a tool block on its first folded output line (fold
+  -- opened); backward always lands on the block header, so K from inside an
+  -- output backs out to its header instead of stalling on the same line.
+  local cur = vim.api.nvim_win_get_cursor(win)[1]
+  local entry = step(cur)
   for _ = 2, count do
+    if not entry then
+      break
+    end
     entry = step(entry.lnum)
   end
-  -- Tool calls land on the first folded output line when there is one.
+  if not entry then
+    return
+  end
   local target = entry.lnum
-  if entry.kind == "tool" then
+  if dir == 1 and entry.kind == "tool" then
     local next_line = vim.api.nvim_buf_get_lines(buf, target, target + 1, false)[1]
     if next_line and next_line:sub(1, 6) == "  │ " then
       target = target + 1

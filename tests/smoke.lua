@@ -178,9 +178,15 @@ check(
   end)
 )
 press("J")
-check("J wraps to the first block", cursor_line() == 1)
+check("J stops at the last block (no wrap)", cursor_line() == 12)
 press("K")
-check("K wraps back to the tool output", cursor_line() == 12)
+check("K steps back to the tool header", cursor_line() == 11)
+press("K")
+check("K reaches the assistant header", cursor_line() == 4)
+press("K")
+check("K reaches the first block", cursor_line() == 1)
+press("K")
+check("K stops at the first block (no wrap)", cursor_line() == 1)
 
 -- 4. Close in takeover mode with restore="scratch" leaves an empty window.
 ndsh.close()
