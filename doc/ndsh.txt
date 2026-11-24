@@ -18,6 +18,7 @@ Message pane (readonly transcript):
   q              Close the panel (detaches the session)
   i              Jump to the input pane, insert mode
   s              Scan messages (telescope or vim.ui picker), jump to one
+  J / K          Jump to next / previous message block (tool outputs open)
   <Tab>          Toggle the fold under cursor (same as |za|)
   za             Toggle fold: tool results and reasoning blocks
   zR / zM        Open / close all folds (native)

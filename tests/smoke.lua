@@ -136,6 +136,52 @@ if #scanned == 3 then
   )
 end
 
+-- 3c. J/K in the message pane jump between transcript blocks; the maps are
+-- buffer-local and never leak to the input pane or file buffers.
+local chat_win3 = vim.fn.bufwinid(chat_buf)
+local input_win3 = vim.fn.bufwinid(input_buf)
+local function press(key)
+  vim.api.nvim_win_call(chat_win3, function()
+    vim.cmd("normal " .. key)
+  end)
+end
+local function cursor_line()
+  return vim.api.nvim_win_get_cursor(chat_win3)[1]
+end
+check(
+  "J mapped in the message pane",
+  vim.api.nvim_win_call(chat_win3, function()
+    return vim.fn.maparg("J", "n") ~= ""
+  end)
+)
+check(
+  "J unmapped in the input pane",
+  vim.api.nvim_win_call(input_win3, function()
+    return vim.fn.maparg("J", "n") == ""
+  end)
+)
+check(
+  "K unmapped in the input pane",
+  vim.api.nvim_win_call(input_win3, function()
+    return vim.fn.maparg("K", "n") == ""
+  end)
+)
+vim.api.nvim_win_set_cursor(chat_win3, { 1, 0 })
+press("J")
+check("J lands on the assistant header", cursor_line() == 4)
+press("J")
+check("J lands inside the tool output", cursor_line() == 12)
+check(
+  "tool output fold opened by the jump",
+  vim.api.nvim_win_call(chat_win3, function()
+    return vim.fn.foldclosed(12) == -1
+  end)
+)
+press("J")
+check("J wraps to the first block", cursor_line() == 1)
+press("K")
+check("K wraps back to the tool output", cursor_line() == 12)
+
 -- 4. Close in takeover mode with restore="scratch" leaves an empty window.
 ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)

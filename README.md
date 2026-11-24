@@ -109,7 +109,8 @@ session working directory, and live context usage
 (`plan · ~/proj · 12k/128k · 10%`), fed by `request/context` capacity
 events and per-message token usage. The message pane stays decoration-free
 and both panes keep normal vim statuslines. Chat buffer locals: `q` closes, `i`
-jumps to input, `<Tab>` toggles tool-result folds. Input: `<C-s>` sends
+jumps to input, `<Tab>` toggles tool-result folds, `J`/`K` jump between message
+blocks (tool outputs unfold), `s` opens the message scanner. Input: `<C-s>` sends
 (insert and normal mode), `<CR>` is a plain newline in insert mode and sends
 in normal mode. If your global "tab" keys operate on buffers (e.g. barbar),
 set `keys.tabnext`/`keys.tabprev` so they switch real tabpages inside the

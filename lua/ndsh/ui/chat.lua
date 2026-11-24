@@ -113,6 +113,14 @@ function M.create(keys, suffix)
   vim.keymap.set("n", "s", function()
     require("ndsh").messages()
   end, { buffer = buf, desc = "Scan ndsh messages" })
+  -- Block navigation: J/K jump between messages (buffer-local only — J's
+  -- join and K's lookup keep working in every other buffer).
+  vim.keymap.set("n", "J", function()
+    require("ndsh.ui.messages").goto_block(buf, 1, vim.v.count1)
+  end, { buffer = buf, desc = "Next ndsh message" })
+  vim.keymap.set("n", "K", function()
+    require("ndsh.ui.messages").goto_block(buf, -1, vim.v.count1)
+  end, { buffer = buf, desc = "Previous ndsh message" })
   require("ndsh.ui.input")._map_tab_nav(buf, keys or {})
   return buf
 end

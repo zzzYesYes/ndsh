@@ -98,6 +98,61 @@ function M.scan(buf)
   return reversed
 end
 
+---Jump to the next/previous transcript block relative to the cursor in the
+---window showing buf. User and assistant entries land on their header; tool
+---entries land on the first output line with the fold opened (zv), so the
+---output is visible. Wraps at both ends.
+---@param buf integer chat buffer
+---@param dir integer 1 forward, -1 backward
+---@param count integer blocks to move
+function M.goto_block(buf, dir, count)
+  local scanned = M.scan(buf) -- newest first; navigation needs buffer order
+  local entries = {}
+  for i = #scanned, 1, -1 do
+    entries[#entries + 1] = scanned[i]
+  end
+  if #entries == 0 then
+    vim.notify("ndsh: no messages yet", vim.log.levels.INFO)
+    return
+  end
+  local win = vim.fn.bufwinid(buf)
+  if win == -1 then
+    return
+  end
+  local function step(line)
+    if dir == 1 then
+      for _, e in ipairs(entries) do
+        if e.lnum > line then
+          return e
+        end
+      end
+      return entries[1]
+    end
+    for i = #entries, 1, -1 do
+      if entries[i].lnum < line then
+        return entries[i]
+      end
+    end
+    return entries[#entries]
+  end
+  local entry = step(vim.api.nvim_win_get_cursor(win)[1])
+  for _ = 2, count do
+    entry = step(entry.lnum)
+  end
+  -- Tool calls land on the first folded output line when there is one.
+  local target = entry.lnum
+  if entry.kind == "tool" then
+    local next_line = vim.api.nvim_buf_get_lines(buf, target, target + 1, false)[1]
+    if next_line and next_line:sub(1, 6) == "  │ " then
+      target = target + 1
+    end
+  end
+  vim.api.nvim_win_set_cursor(win, { target, 0 })
+  vim.api.nvim_win_call(win, function()
+    vim.cmd("normal! zvzz")
+  end)
+end
+
 ---Open the message picker for a conversation. Calls on_select(entry) with
 ---the chosen entry.
 ---@param conv table
