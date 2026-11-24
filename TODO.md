@@ -21,6 +21,14 @@ docs/upstream-sdk-plan.md.
 - **Auto-title sessions** from the first prompt instead of `chat N`.
 - **Telescope preview** of the transcript tail in the session navigator.
 
+## Docs
+
+- **Rewrite README in the usual nvim plugin shape**: intro with a
+  screenshot/demo, requirements, install (lazy.nvim spec), and a keymaps
+  table. Move the feature inventory into a detailed doc (every feature,
+  its default keys and its :NDSH* command), cross-linked with
+  doc/ndsh.txt.
+
 ## Upstream (fork of deepseek-harness)
 
 Per docs/upstream-sdk-plan.md, in priority order:
@@ -38,5 +46,5 @@ Per docs/upstream-sdk-plan.md, in priority order:
 
 ## Ops
 
-- CI (GitHub Actions) running the five suites headlessly:
-  deps, unit, smoke, features, integration.
+- CI (GitHub Actions) running the six suites headlessly:
+  deps, unit, smoke, features, restart, integration.
