@@ -42,6 +42,18 @@ local function node_bin(cfg)
   return (bin and vim.uv.fs_stat(bin)) and bin or nil
 end
 
+---@return string|nil version of the installed managed dsh package
+local function dsh_installed_version()
+  local pkg = root() .. "/runtime/node_modules/@deepseek-ai/dsh/package.json"
+  local fd = io.open(pkg, "r")
+  if not fd then
+    return nil
+  end
+  local ok, parsed = pcall(vim.json.decode, fd:read("*a"))
+  fd:close()
+  return (ok and type(parsed) == "table") and parsed.version or nil
+end
+
 ---@return string|nil path to the managed dsh entrypoint
 local function dsh_entry()
   local entry = root() .. "/runtime/node_modules/@deepseek-ai/dsh/lib/bin.js"
@@ -124,17 +136,22 @@ function M.install(cfg, cb)
 
   local install_dsh ---@type function
   local finish = function()
-    if M.runtime_cmd(cfg) then
+    if M.runtime_cmd(cfg) and dsh_installed_version() == cfg.dsh.version then
       done(true)
     else
-      fail("install finished but the dsh entrypoint is missing")
+      fail(("install finished but the runtime is missing or at the wrong version (want %s, have %s)"):format(
+        cfg.dsh.version,
+        tostring(dsh_installed_version())
+      ))
     end
   end
 
   ---npm install the pinned dsh with the managed node (PATH carries node for
-  ---npm's own node lookups and any lifecycle scripts).
+  ---npm's own node lookups and any lifecycle scripts). An installed package
+  ---at a different version than the pin is reinstalled, so bumping
+  ---dsh.version upgrades the managed runtime.
   install_dsh = function()
-    if dsh_entry() then
+    if dsh_entry() and dsh_installed_version() == cfg.dsh.version then
       return finish()
     end
     local node = node_bin(cfg)
