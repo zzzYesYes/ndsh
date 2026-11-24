@@ -21,6 +21,8 @@ M.defaults = {
     --- Session navigator and new-session mappings; nil to define your own.
     sessions = "<leader>ans",
     new_session = "<leader>ann",
+    --- Transcript message scanner; nil to define your own.
+    messages = "<leader>anm",
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
     --- are meaningless inside the reserved panel windows, so bind them to

@@ -51,6 +51,10 @@ vim.api.nvim_create_user_command("NDSHSessions", function()
   require("ndsh").sessions()
 end, { desc = "Navigate ndsh sessions" })
 
+vim.api.nvim_create_user_command("NDSHMessages", function()
+  require("ndsh").messages()
+end, { desc = "Scan transcript messages and jump to one" })
+
 vim.api.nvim_create_user_command("NDSHRename", function(args)
   require("ndsh").rename(args.args ~= "" and args.args or nil)
 end, { desc = "Rename the current session", nargs = "?" })

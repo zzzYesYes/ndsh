@@ -21,6 +21,10 @@ end
 
 local ndsh = require("ndsh")
 
+-- Isolate the test from the user's real data dir: without store_path,
+-- setup() restores persisted sessions and the checks below would see them.
+local store_path = vim.fn.tempname() .. ".json"
+
 -- No dsh runtime exists in the test environment, so opening the panel
 -- triggers the managed-bootstrap offer; decline it without blocking.
 vim.ui.select = function(_, _, cb)
@@ -29,7 +33,7 @@ end
 
 -- 1. Takeover layout: a fresh headless nvim has one empty window.
 -- auto_connect off: the frame smoke must not spawn a real runtime.
-ndsh.setup({ restore = "scratch", dsh = { auto_connect = false } })
+ndsh.setup({ restore = "scratch", store_path = store_path, dsh = { auto_connect = false } })
 ndsh.open()
 local wins = vim.api.nvim_tabpage_list_wins(0)
 check("takeover: panel is 2 windows", #wins == 2)
@@ -104,6 +108,34 @@ local fold_ok = vim.api.nvim_win_call(chat_win, function()
 end)
 check("tool result folded closed", fold_ok)
 
+-- 3b. The message scanner enumerates the rendered transcript, newest
+-- first; selecting an entry jumps the chat window to it. Telescope is
+-- absent under -u NONE, so this exercises the vim.ui.select fallback.
+local scanned = require("ndsh.ui.messages").scan(chat_buf)
+check("scanner finds user, assistant and tool entries", #scanned == 3)
+if #scanned == 3 then
+  check("scanner newest first is the tool call", scanned[1].kind == "tool" and scanned[1].icon == "✓")
+  check(
+    "scanner assistant entry carries first line",
+    scanned[2].kind == "assistant" and scanned[2].text:find("hi. running", 1, true) ~= nil
+  )
+  check(
+    "scanner user entry carries the prompt",
+    scanned[3].kind == "user" and scanned[3].text == "hello ndsh"
+  )
+  check("scanner user ordinal holds the message", scanned[3].ordinal:find("hello ndsh", 1, true) ~= nil)
+  local decline = vim.ui.select
+  vim.ui.select = function(items, _, cb)
+    cb(items[#items]) -- oldest entry: the user prompt
+  end
+  ndsh.messages()
+  vim.ui.select = decline
+  check(
+    "scanner jump lands on the user header",
+    vim.api.nvim_win_get_cursor(vim.fn.bufwinid(chat_buf))[1] == scanned[3].lnum
+  )
+end
+
 -- 4. Close in takeover mode with restore="scratch" leaves an empty window.
 ndsh.close()
 wins = vim.api.nvim_tabpage_list_wins(0)
@@ -119,6 +151,7 @@ ndsh.setup({
   restore = function(win)
     vim.api.nvim_buf_set_name(vim.api.nvim_win_get_buf(win), "restored-marker")
   end,
+  store_path = store_path,
   dsh = { auto_connect = false },
 })
 ndsh.open()
@@ -130,7 +163,7 @@ check(
   vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(wins[1])):find("restored%-marker$") ~= nil
 )
 vim.cmd("bwipeout!")
-ndsh.setup({ restore = "scratch", dsh = { auto_connect = false } })
+ndsh.setup({ restore = "scratch", store_path = store_path, dsh = { auto_connect = false } })
 
 -- 5. With a code buffer up, the panel docks right (3 windows) instead.
 vim.cmd("edit " .. vim.fn.tempname() .. ".txt")
@@ -217,7 +250,7 @@ ndsh.close()
 -- 11. restore = "quit" (the default) exits Neovim when the closing panel
 -- is the only pane left. Runs last: a successful close ends the process.
 vim.cmd("enew")
-ndsh.setup({ restore = "quit", dsh = { auto_connect = false } })
+ndsh.setup({ restore = "quit", store_path = store_path, dsh = { auto_connect = false } })
 ndsh.open()
 check("quit mode: panel takes over", ndsh.is_open())
 

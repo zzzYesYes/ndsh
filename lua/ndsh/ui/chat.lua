@@ -108,6 +108,9 @@ function M.create(keys, suffix)
     require("ndsh").focus_input()
   end, { buffer = buf, desc = "Jump to ndsh input" })
   vim.keymap.set("n", "<Tab>", "za", { buffer = buf, desc = "Toggle fold" })
+  vim.keymap.set("n", "s", function()
+    require("ndsh").messages()
+  end, { buffer = buf, desc = "Scan ndsh messages" })
   require("ndsh.ui.input")._map_tab_nav(buf, keys or {})
   return buf
 end

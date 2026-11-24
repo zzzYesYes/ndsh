@@ -8,6 +8,7 @@ local commands = require("ndsh.commands")
 local persist = require("ndsh.persist")
 local prompts = require("ndsh.ui.prompts")
 local sessions_ui = require("ndsh.ui.sessions")
+local messages_ui = require("ndsh.ui.messages")
 
 local M = {}
 
@@ -187,6 +188,7 @@ function M.setup(opts)
   end
   map(state.cfg.keys.toggle, M.toggle, "Toggle ndsh panel")
   map(state.cfg.keys.sessions, M.sessions, "Navigate ndsh sessions")
+  map(state.cfg.keys.messages, M.messages, "Scan ndsh messages")
   map(state.cfg.keys.new_session, function()
     M.new_session()
   end, "New ndsh session")
@@ -302,6 +304,30 @@ function M.sessions()
     return (state.activity[a.id] or 0) > (state.activity[b.id] or 0)
   end)
   sessions_ui.open(ordered, goto_conversation)
+end
+
+---Scan the active conversation's transcript and jump to a message
+---(:NDSHMessages): telescope picker when available, vim.ui.select otherwise.
+function M.messages()
+  ensure_setup()
+  local conv = state.active
+  if not conv then
+    vim.notify("ndsh: no active session; :NDSHNew to create one", vim.log.levels.INFO)
+    return
+  end
+  messages_ui.open(conv, function(entry)
+    if not conv:is_open() then
+      M.open()
+    end
+    if conv.chat_win and vim.api.nvim_win_is_valid(conv.chat_win) then
+      vim.fn.win_gotoid(conv.chat_win)
+      vim.api.nvim_win_set_cursor(conv.chat_win, { entry.lnum, 0 })
+      vim.api.nvim_win_call(conv.chat_win, function()
+        vim.cmd("normal! zvzz")
+      end)
+      conv:mark_read()
+    end
+  end)
 end
 
 ---Rename the active conversation (:NDSHRename and /rename).

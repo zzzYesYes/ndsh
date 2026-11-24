@@ -49,6 +49,7 @@ and intentionally not pinned down there).
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ant`) |
 | `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
 | `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
+| `:NDSHMessages` | Scan transcript messages and jump to one (`<leader>anm`, or `s` in the chat pane) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
 | `:NDSHDelete` | Delete the current session (with confirmation) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |

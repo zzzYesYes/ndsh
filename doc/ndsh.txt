@@ -17,6 +17,7 @@ mappings are NOT documented here: they are user configuration (see
 Message pane (readonly transcript):
   q              Close the panel (detaches the session)
   i              Jump to the input pane, insert mode
+  s              Scan messages (telescope or vim.ui picker), jump to one
   <Tab>          Toggle the fold under cursor (same as |za|)
   za             Toggle fold: tool results and reasoning blocks
   zR / zM        Open / close all folds (native)
@@ -63,6 +64,7 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHClose         Close the panel
   :NDSHNew [name]    Create a session and swap the panel to it
   :NDSHSessions      Session navigator (telescope or vim.ui picker)
+  :NDSHMessages      Scan transcript messages and jump to one
   :NDSHRename [name] Rename the current session
   :NDSHDelete        Delete the current session (asks for confirmation)
   :NDSHConnect       Connect a provider (stores credentials)
@@ -95,6 +97,7 @@ With nothing resolvable, first use offers to bootstrap the managed runtime
 Key mappings are fields under keys = {} and are intentionally user-owned:
   keys.toggle       panel toggle
   keys.sessions     session navigator
+  keys.messages     transcript message scanner
   keys.new_session  new session
   keys.send         list of send keys in the input pane
   keys.tabnext      tabpage navigation inside panel windows
