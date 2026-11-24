@@ -63,6 +63,7 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHOpen          Open the panel
   :NDSHClose         Close the panel
   :NDSHNew [name]    Create a session and swap the panel to it
+  :NDSHResume        Resume the most recently active session
   :NDSHSessions      Session navigator (telescope or vim.ui picker)
   :NDSHMessages      Scan transcript messages and jump to one
   :NDSHRename [name] Rename the current session
@@ -98,6 +99,7 @@ Key mappings are fields under keys = {} and are intentionally user-owned:
   keys.toggle       panel toggle
   keys.sessions     session navigator
   keys.messages     transcript message scanner
+  keys.resume       resume the most recently active session
   keys.new_session  new session
   keys.send         list of send keys in the input pane
   keys.tabnext      tabpage navigation inside panel windows
@@ -111,8 +113,10 @@ The input pane winbar shows agent status (an ASCII spinner while running),
 the active model on the left, and the working directory with context usage
 (used/window · %) on the right.
 
-Sessions persist across nvim restarts (sessions.json beside the store);
-activating a stored session resumes its wire session, and the transcript
-restarts with a "session resumed" notice.
+Sessions persist across nvim restarts (sessions.json beside the store), and
+each session's transcript is saved beside it (transcripts/<id>.md) and
+reloaded on activation; activating a stored session resumes its wire
+session. Wire sessions are stored per working directory by dsh: a session
+restored under a different cwd starts fresh, transcript kept.
 
  vim:tw=78:ts=8:ft=help:norl:

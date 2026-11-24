@@ -48,6 +48,7 @@ and intentionally not pinned down there).
 |---|---|
 | `:NDSHToggle` | Toggle the panel (default map: `<leader>ant`) |
 | `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
+| `:NDSHResume` | Resume the most recently active session (`<leader>anr`) |
 | `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
 | `:NDSHMessages` | Scan transcript messages and jump to one (`<leader>anm`, or `s` in the chat pane) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
@@ -76,13 +77,16 @@ current session locally; other slash commands pass through to the runtime.
 ## Persistence and resume
 
 The registry persists to `sessions.json` beside the store, so sessions
-survive nvim restarts (`persist_sessions = true` by default). Restored
-sessions appear in the navigator as detached entries; activating one calls
-`session/resume` on the wire and the agent continues with its full context
-— the transcript pane starts empty with a "session resumed" notice (no
-history read on the wire yet; see docs/upstream-sdk-plan.md). If a stored
-session can't be resumed (store wiped, format changed), it starts fresh
-under the same name.
+survive nvim restarts (`persist_sessions = true` by default), and each
+session's rendered transcript is saved to `transcripts/<id>.md` beside it
+(on exit and at every turn end). Restored sessions appear in the navigator
+as detached entries; `<leader>anr` (`:NDSHResume`) jumps straight back into
+the most recently active one. Activating a restored session reloads its
+transcript and calls `session/resume` on the wire — the agent continues
+with its full context (no history read on the wire yet; see
+docs/upstream-sdk-plan.md). Wire sessions are stored per working directory
+by dsh, so a session restored from a different cwd starts fresh (its
+transcript stays) with a notice, as does one whose wire session is gone.
 
 `:NDSHDelete` removes the active session after confirmation — registry,
 transcript buffers, and store record. The wire session keeps running in
@@ -137,6 +141,7 @@ nvim --headless -u NONE -l tests/deps.lua                                     # 
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/unit.lua        # protocol/framing units
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/smoke.lua       # UI frame
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/features.lua    # connect/model flows
+nvim --headless -u NONE --cmd "set rtp+=." -l tests/restart.lua     # persistence across two processes
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/integration.lua # full stack vs tests/fixtures/fake_dsh.py
 ```
 

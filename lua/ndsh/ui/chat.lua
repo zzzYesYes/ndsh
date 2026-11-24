@@ -224,6 +224,42 @@ function M.notice(buf, text)
   highlight_line(buf, lnum, "NDSHAssistantHeader")
 end
 
+---Restore a persisted transcript into an empty chat buffer (the registry
+---restore path). Raw lines plus header/tool highlighting; writer state is
+---marked non-empty so live events append after the restored content.
+---@param buf integer
+---@param lines string[]
+function M.restore(buf, lines)
+  local s = state(buf)
+  if not s.empty then
+    return
+  end
+  append_lines(buf, lines)
+  for i, line in ipairs(lines) do
+    local hl
+    if line == "❯ You" then
+      hl = "NDSHUserHeader"
+    elseif line == "● ndsh" or line:match("^─ .+ ─$") then
+      hl = "NDSHAssistantHeader"
+    elseif line == "∴ thinking" then
+      hl = "NDSHThinking"
+    else
+      -- Tool icons are 3-byte UTF-8; byte slice, not a pattern class.
+      local icon = line:sub(1, 3)
+      if icon == "✓" then
+        hl = "NDSHToolOk"
+      elseif icon == "✗" then
+        hl = "NDSHToolErr"
+      elseif icon == "⠋" then
+        hl = "NDSHToolRunning"
+      end
+    end
+    if hl then
+      highlight_line(buf, i - 1, hl)
+    end
+  end
+end
+
 ---Render an error block in the transcript (e.g. a failed turn's reason).
 ---@param buf integer
 ---@param text string

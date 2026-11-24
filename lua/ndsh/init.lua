@@ -79,9 +79,40 @@ local function persist_save()
       name = conv.name,
       created = conv.created,
       last_active = conv.last_active or conv.created,
+      cwd = conv.cwd,
     }
   end
   persist.save(state.cfg, entries)
+end
+
+---Write one conversation's transcript to disk (turn/end and VimLeavePre).
+---@param conv table
+local function save_transcript(conv)
+  if not state.cfg.persist_sessions then
+    return
+  end
+  if not (conv.chat_buf and vim.api.nvim_buf_is_valid(conv.chat_buf)) then
+    return
+  end
+  local lines = vim.api.nvim_buf_get_lines(conv.chat_buf, 0, -1, false)
+  if #lines <= 1 and (lines[1] or "") == "" then
+    return -- nothing rendered yet; don't clobber a previous transcript
+  end
+  persist.save_transcript(state.cfg, conv.id, lines)
+end
+
+---Load a restored (detached) conversation's persisted transcript, once.
+---Must run before any fresh-start id change: the file is keyed by wire id.
+---@param conv table
+local function restore_transcript(conv)
+  if conv.transcript_restored then
+    return
+  end
+  conv.transcript_restored = true
+  local lines = persist.load_transcript(state.cfg, conv.id)
+  if lines then
+    require("ndsh.ui.chat").restore(conv.chat_buf, lines)
+  end
 end
 
 ---Create and register a conversation. With `stored`, restores a persisted
@@ -130,6 +161,7 @@ local function new_conversation(name, stored)
   })
   conv.created = stored and stored.created or os.time()
   conv.last_active = stored and stored.last_active or conv.created
+  conv.cwd = stored and stored.cwd or vim.uv.cwd()
   conv.resume_state = stored and "detached" or "live"
   state.conversations[#state.conversations + 1] = conv
   state.by_id[conv.id] = conv
@@ -177,8 +209,17 @@ function M.setup(opts)
   -- Restore persisted conversations as detached entries (once per process).
   if state.cfg.persist_sessions and not state.restored then
     state.restored = true
-    for _, stored in ipairs(persist.load(state.cfg)) do
+    local stored_list = persist.load(state.cfg)
+    for _, stored in ipairs(stored_list) do
       new_conversation(nil, stored)
+    end
+    -- Continue auto-naming past restored "chat N" sessions so a new session
+    -- never reuses a restored session's name; custom names don't count.
+    for _, conv in ipairs(state.conversations) do
+      local n = conv.name:match("^chat (%d+)$")
+      if n then
+        state.live_seq = math.max(state.live_seq or 0, tonumber(n))
+      end
     end
   end
   local function map(key, fn, desc)
@@ -189,12 +230,16 @@ function M.setup(opts)
   map(state.cfg.keys.toggle, M.toggle, "Toggle ndsh panel")
   map(state.cfg.keys.sessions, M.sessions, "Navigate ndsh sessions")
   map(state.cfg.keys.messages, M.messages, "Scan ndsh messages")
+  map(state.cfg.keys.resume, M.resume_last, "Resume last ndsh session")
   map(state.cfg.keys.new_session, function()
     M.new_session()
   end, "New ndsh session")
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = vim.api.nvim_create_augroup("ndsh_lifecycle", { clear = true }),
     callback = function()
+      for _, conv in ipairs(state.conversations) do
+        save_transcript(conv)
+      end
       M.stop_session()
     end,
   })
@@ -246,28 +291,44 @@ function M.new_session(name)
   return conv
 end
 
+---Continue a detached conversation as a fresh live session: new wire id,
+---transcript kept in the buffer; the persisted record and transcript file
+---move to the new id (the next transcript save carries the restored lines).
+---@param conv table
+---@param notice string transcript notice explaining why
+local function start_fresh(conv, notice)
+  local old_id = conv.id
+  state.by_id[old_id] = nil
+  conv.id = ("ndsh-%d-%d"):format(state.seq, math.random(100000))
+  state.by_id[conv.id] = conv
+  conv.resume_state = "live"
+  persist.delete_transcript(state.cfg, old_id)
+  conv:apply_op({ op = "notice", text = notice })
+  persist_save()
+  conv:refresh_chrome()
+end
+
 ---Resume a detached conversation's wire session. On rejection the session
 ---continues fresh under the same name with a new wire id; on success the
----runtime reattaches with the model-side context intact (the transcript
----starts empty — no history read on the wire yet).
+---runtime reattaches with the model-side context intact.
 ---@param conv table
 local function resume_conversation(conv)
   M._ensure_runtime()
+  if not state.runtime or state.runtime.state == "error" then
+    -- No runtime to resume on (bootstrap declined, resolve failed): go
+    -- straight to fresh-start instead of hanging in "resuming" forever.
+    start_fresh(conv, "no runtime to resume on; starting fresh")
+    return
+  end
   conv.resume_state = "resuming"
   state.runtime:resume(conv.id, function(_, err)
     if err then
-      state.by_id[conv.id] = nil
-      conv.id = ("ndsh-%d-%d"):format(state.seq, math.random(100000))
-      state.by_id[conv.id] = conv
-      conv.resume_state = "live"
-      conv:apply_op({ op = "notice", text = "previous session could not be resumed; starting fresh" })
-      persist_save()
-      conv:refresh_chrome()
+      start_fresh(conv, "previous session could not be resumed; starting fresh")
       vim.notify(("ndsh: could not resume %q; starting fresh"):format(conv.name), vim.log.levels.WARN)
       return
     end
     conv.resume_state = "live"
-    conv:apply_op({ op = "notice", text = "session resumed — the agent remembers; the transcript starts here" })
+    conv:apply_op({ op = "notice", text = "session resumed — the agent remembers" })
     persist_save()
     conv:refresh_chrome()
   end)
@@ -277,7 +338,16 @@ end
 ---@param conv table
 local function goto_conversation(conv)
   if conv.resume_state == "detached" then
-    resume_conversation(conv)
+    -- Transcript first: it is keyed by the original wire id, which a
+    -- fresh-start fallback replaces.
+    restore_transcript(conv)
+    if conv.cwd and conv.cwd ~= vim.uv.cwd() then
+      -- dsh stores wire sessions per working directory; from another cwd
+      -- there is nothing to resume.
+      start_fresh(conv, ("session was in %s; starting fresh here"):format(vim.fn.fnamemodify(conv.cwd, ":~")))
+    else
+      resume_conversation(conv)
+    end
   end
   show_conversation(conv)
   conv:mark_read()
@@ -304,6 +374,24 @@ function M.sessions()
     return (state.activity[a.id] or 0) > (state.activity[b.id] or 0)
   end)
   sessions_ui.open(ordered, goto_conversation)
+end
+
+---Reactivate the most recently active session (:NDSHResume): a restored
+---detached session resumes on the wire; a live one is simply focused.
+function M.resume_last()
+  ensure_setup()
+  local best, best_stamp = nil, -1
+  for _, conv in ipairs(state.conversations) do
+    local stamp = conv.last_active or conv.created or 0
+    if stamp > best_stamp then
+      best, best_stamp = conv, stamp
+    end
+  end
+  if not best then
+    vim.notify("ndsh: no previous session; :NDSHNew to start one", vim.log.levels.INFO)
+    return
+  end
+  goto_conversation(best)
 end
 
 ---Scan the active conversation's transcript and jump to a message
@@ -381,6 +469,7 @@ function M._delete_conversation(conv)
       pcall(vim.api.nvim_buf_delete, buf, { force = true })
     end
   end
+  persist.delete_transcript(state.cfg, conv.id)
   state.by_id[conv.id] = nil
   state.activity[conv.id] = nil
   for i, c in ipairs(state.conversations) do
@@ -436,6 +525,9 @@ function M._route_event(session_id, event)
   local conv = state.by_id[session_id]
   if conv then
     conv:apply_event(event)
+    if event.type == "turn/end" then
+      save_transcript(conv)
+    end
   end
 end
 

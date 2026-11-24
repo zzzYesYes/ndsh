@@ -47,6 +47,10 @@ vim.api.nvim_create_user_command("NDSHNew", function(args)
   require("ndsh").new_session(args.args ~= "" and args.args or nil)
 end, { desc = "New ndsh session (optional name)", nargs = "?" })
 
+vim.api.nvim_create_user_command("NDSHResume", function()
+  require("ndsh").resume_last()
+end, { desc = "Resume the most recently active ndsh session" })
+
 vim.api.nvim_create_user_command("NDSHSessions", function()
   require("ndsh").sessions()
 end, { desc = "Navigate ndsh sessions" })

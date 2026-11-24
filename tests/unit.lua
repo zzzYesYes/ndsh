@@ -300,12 +300,24 @@ do
   local config = require("ndsh.config")
   local dir = vim.fn.tempname()
   local cfg = config.resolve({ store_path = dir .. "/credentials.json" })
-  persist.save(cfg, { { id = "wire-1", name = "old chat", created = 100, last_active = 200 } })
+  persist.save(cfg, { { id = "wire-1", name = "old chat", created = 100, last_active = 200, cwd = "/proj" } })
   local loaded = persist.load(cfg)
   check(
     "persist roundtrip",
-    #loaded == 1 and loaded[1].id == "wire-1" and loaded[1].name == "old chat" and loaded[1].last_active == 200
+    #loaded == 1
+      and loaded[1].id == "wire-1"
+      and loaded[1].name == "old chat"
+      and loaded[1].last_active == 200
+      and loaded[1].cwd == "/proj"
   )
+  persist.save_transcript(cfg, "wire-1", { "❯ You", "hello", "", "● ndsh", "hi" })
+  local transcript = persist.load_transcript(cfg, "wire-1")
+  check(
+    "transcript roundtrip",
+    transcript ~= nil and #transcript == 5 and transcript[1] == "❯ You" and transcript[5] == "hi"
+  )
+  persist.delete_transcript(cfg, "wire-1")
+  check("transcript deleted", persist.load_transcript(cfg, "wire-1") == nil)
   local empty = persist.load(config.resolve({ store_path = vim.fn.tempname() .. "/c.json" }))
   check("persist empty when file missing", #empty == 0)
   vim.fn.delete(dir, "rf")
