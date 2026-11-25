@@ -121,7 +121,7 @@ check("tool result folded closed", fold_ok)
 check(
   "first message persists the session",
   vim.fn.filereadable(sessions_file) == 1
-    and table.concat(vim.fn.readfile(sessions_file), "\n"):find("chat 1", 1, true) ~= nil
+    and table.concat(vim.fn.readfile(sessions_file), "\n"):find("hello ndsh", 1, true) ~= nil
 )
 
 -- 3b. The message scanner enumerates the rendered transcript, newest

@@ -90,7 +90,7 @@ function M.project(event)
     }
   elseif t == "tool/call" then
     return {
-      { op = "tool_begin", id = d.callId, name = d.name, summary = summarize_arguments(d.arguments or "") },
+      { op = "tool_begin", id = d.callId, name = d.name, summary = summarize_arguments(d.arguments or ""), arguments = d.arguments },
     }
   elseif t == "tool/result" then
     local message = d.message or {}

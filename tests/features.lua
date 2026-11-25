@@ -146,6 +146,17 @@ check(
 )
 check("custom model restarts the runtime", restarted == 3)
 
+-- 6. Reasoning effort picker: sets the config, persists with the route,
+-- restarts the runtime.
+vim.ui.select = function(items, _, on_choice)
+  on_choice(items[select_pick], select_pick)
+end
+select_pick = 3 -- off, low, high, max, auto
+ndsh.select_reasoning_effort()
+current = credentials.current(store_path)
+check("reasoning effort persists with the route", current ~= nil and current.reasoning_effort == "high")
+check("effort switch restarts the runtime", restarted == 4)
+
 ndsh.restart_session = orig_restart
 vim.fn.delete(store_dir, "rf")
 

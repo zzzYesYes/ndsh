@@ -3,11 +3,42 @@
 --- (dressing, telescope, builtin) can present them.
 local M = {}
 
+---Pretty-print a raw arguments JSON string as indented one-line `key:
+---value` rows (long values truncated); nil when undecodable.
+---@param raw string
+---@return string|nil
+local function format_arguments(raw)
+  local ok, decoded = pcall(vim.json.decode, raw)
+  if not ok or type(decoded) ~= "table" then
+    return nil
+  end
+  local keys = vim.tbl_keys(decoded)
+  table.sort(keys)
+  local lines = {}
+  for _, k in ipairs(keys) do
+    local v = decoded[k]
+    if type(v) ~= "string" then
+      v = vim.json.encode(v)
+    end
+    v = v:gsub("\n", "\\n")
+    if #v > 120 then
+      v = v:sub(1, 119) .. "…"
+    end
+    lines[#lines + 1] = ("  %s: %s"):format(k, v)
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, "\n")
+end
+
 --- approval/request: one-shot allow/reject/cancel for one tool operation.
----@param params { toolName: string, reason: string|nil }
+--- When the tool/call event arrived first, `call` carries its arguments.
+---@param params { toolName: string, reason: string|nil, callId: string|nil }
 ---@param respond fun(result: any|nil, err: table|nil)
 ---@param conv_name string|nil session the approval belongs to
-function M.approval(params, respond, conv_name)
+---@param call { name: string, summary: string, arguments: string|nil }|nil
+function M.approval(params, respond, conv_name, call)
   local choices = {
     { label = "Allow once", outcome = "allowed-once" },
     { label = "Reject", outcome = "rejected" },
@@ -19,6 +50,12 @@ function M.approval(params, respond, conv_name)
   )
   if params.reason then
     prompt = prompt .. "\n" .. params.reason
+  end
+  if call and call.arguments then
+    local args = format_arguments(call.arguments)
+    if args then
+      prompt = prompt .. "\n" .. args
+    end
   end
   vim.ui.select(choices, {
     prompt = prompt,

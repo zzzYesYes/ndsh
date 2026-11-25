@@ -4,10 +4,35 @@ Neovim chat UI for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-ha
 
 `ndsh` spawns `dsh --profile sdk` and drives it over the SDK's
 newline-delimited JSON-RPC protocol, rendering the session in native Neovim
-buffers. Approvals and user questions are answered through `vim.ui`.
+windows: a multi-session agent panel with persisted, resumable
+conversations — no external UI dependencies.
 
-Status: milestone 2 done — panel frame plus a live SDK backend verified
-against a scripted fixture runtime and a real `dsh` process.
+## Features
+
+- **Chat panel** docked right/bottom/float, or full-tab takeover on empty
+  windows — markdown transcript, folded tool results and reasoning, native
+  window navigation
+- **Multi-session**: one runtime, any number of conversations; telescope
+  navigator with transcript-tail preview and `<C-d>` deletion
+- **Sessions survive restarts**: registry + transcripts persist; wire
+  sessions resume on the runtime with full context
+- **Model & reasoning-effort switching**: live provider model discovery,
+  per-session resumes keep context across runtime restarts
+- **Plan-mode and effort indicators** in the winbar, with live context usage
+- **Transcript navigation**: message scanner (telescope), `J`/`K` block jumps
+- **Approvals & user questions** through `vim.ui`, with tool arguments
+- **Zero-install runtime**: bootstraps a pinned Node.js + `@deepseek-ai/dsh`
+  on first use (`:NDSHInstallRuntime`)
+
+The full inventory with every key and command: [docs/features.md](docs/features.md).
+
+## Requirements
+
+- Neovim 0.12+
+- `curl`, `tar`, `sha256sum` (runtime bootstrap only)
+- Optional: [telescope.nvim](https://github.com/nvim-telescope/telescope.nvim)
+  (pickers; `vim.ui.select` fallback), nvim-treesitter markdown parser
+  (assistant highlighting)
 
 ## Install
 
@@ -21,8 +46,12 @@ With lazy.nvim:
 }
 ```
 
+On first run with no `dsh` available, ndsh offers to bootstrap a managed
+runtime itself: a pinned Node.js plus `@deepseek-ai/dsh` downloaded into
+`stdpath("data")/ndsh/bootstrap`. No manual installs required.
+
 ndsh defines no keybindings on its own — bind the actions you want via
-`keys` (all commands stay available regardless):
+`keys`:
 
 ```lua
 opts = {
@@ -37,126 +66,37 @@ opts = {
 }
 ```
 
-On first run with no `dsh` available, ndsh offers to bootstrap a managed
-runtime itself: a pinned Node.js plus `@deepseek-ai/dsh` downloaded into
-`stdpath("data")/ndsh/bootstrap` (needs only `curl`, `tar`, and
-`sha256sum`; see `:NDSHInstallRuntime`). No manual installs required.
+## Quick start
 
-For development, point at a local checkout instead:
+1. `:NDSHConnect` — pick a provider, enter its API key, choose a model from
+   the live catalog. Stored owner-only at `stdpath("data")/ndsh/credentials.json`.
+2. Open the panel (your `toggle` key) and chat. `/new [name]` starts another
+   session; `/rename`, `/compact`, `/goal`, `/plan` work in the input.
+3. Restart Neovim freely: sessions and transcripts come back; resume the last
+   one with your `resume` key.
 
-```lua
-{ dir = "~/workspace/ndsh", opts = {} }
-```
-
-or manually:
-
-```vim
-set runtimepath+=~/workspace/ndsh
-```
-
-## Usage
-
-Full key reference lives in the vim help: `:helptags doc` then `:help ndsh`
-(it documents the stable panel-local keys; leader mappings are user config
-and intentionally not pinned down there).
+## Commands
 
 | Command | Action |
 |---|---|
-| `:NDSHToggle` | Toggle the panel |
-| `:NDSHNew [name]` | New session in the panel (or `/new [name]` in the input) |
+| `:NDSHToggle` / `:NDSHOpen` / `:NDSHClose` | Panel visibility |
+| `:NDSHNew [name]` | New session (or `/new [name]` in the input) |
 | `:NDSHResume` | Resume the most recently active session |
-| `:NDSHSessions` | Session navigator (telescope or `vim.ui`; `<C-d>` deletes an entry) |
-| `:NDSHMessages` | Scan transcript messages and jump to one (`s` in the message pane) |
-| `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
+| `:NDSHSessions` | Session navigator (`<C-d>` deletes an entry) |
+| `:NDSHMessages` | Scan transcript messages and jump to one |
+| `:NDSHRename [name]` | Rename the current session (or `/rename <name>`) |
 | `:NDSHDelete` | Delete the current session (with confirmation) |
-| `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
+| `:NDSHConnect` | Connect a provider (credentials + live model catalog) |
+| `:NDSHModel` | Switch model (persists; sessions resume on the new route) |
+| `:NDSHReasoning` | Switch reasoning effort (off/low/high/max or auto) |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
-| `:NDSHInstallRuntime` | Install the managed runtime (pinned Node.js + `@deepseek-ai/dsh`) |
-| `:NDSHConnect` | Connect a provider (stores credentials; pick from the live model catalog) |
-| `:NDSHModel` | Select the active model (telescope picker; persists; restarts the runtime). Includes an "other model…" entry per connected provider for any model name without re-entering credentials |
+| `:NDSHInstallRuntime` | Install/repair the managed runtime |
 | `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 
-## Multi-session
+Full key reference lives in the vim help: `:helptags doc` then `:help ndsh`.
 
-One runtime multiplexes any number of conversations. The right-docked panel
-shows one session at a time; `:NDSHNew` and the navigator swap its contents,
-and each session keeps its own transcript, status, and wire session in the
-background. The message pane's winbar shows the session name (with an
-unread ● when activity arrives while hidden); the input pane's winbar keeps
-status, model, working directory, and context usage. Closing the panel
-detaches the session — transcripts persist and the navigator brings it back.
-All sessions share the runtime's provider/model (an SDK limitation; see
-docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
-current session locally; other slash commands pass through to the runtime.
-
-## Persistence and resume
-
-The registry persists to `sessions.json` beside the store, so sessions
-survive nvim restarts (`persist_sessions = true` by default), and each
-session's rendered transcript is saved to `transcripts/<id>.md` beside it
-(on exit and at every turn end). Restored sessions appear in the navigator
-as detached entries; `:NDSHResume` jumps straight back into
-the most recently active one. Activating a restored session reloads its
-transcript and calls `session/resume` on the wire — the agent continues
-with its full context (no history read on the wire yet; see
-docs/upstream-sdk-plan.md). Wire sessions are stored per working directory
-by dsh, so a session restored from a different cwd starts fresh (its
-transcript stays) with a notice, as does one whose wire session is gone.
-
-`:NDSHDelete` removes the active session after confirmation — registry,
-transcript buffers, and store record. The wire session keeps running in
-the runtime until its next restart; the SDK has no session/close yet.
-
-Layout adapts: with no file buffer up (empty window, dashboard, scratch) the
-panel takes the whole tab like a full-screen TUI session; with code buffers
-open it docks right by default (`layout = "right" | "bottom" | "float"`).
-When a takeover panel is the only pane left, closing restores what was
-there: the replaced content (a dashboard or any buffer, reopened if it
-self-wiped), or — from an empty scratch — Neovim exits like `:q` on the
-last file window (`restore = "quit"`, the default); alternatives are
-`"dashboard"`, `"scratch"`, or a `fun(win)` hook.
-
-The panel is ordinary windows, so `<C-w>h/j/k/l` navigation and resizing are
-native. The chat (input) pane's winbar carries all chrome: agent status and
-active model on the left; right-aligned the plan/build mode (colored,
-following `/plan` toggles via `plan/mode` events, persisted per session),
-session working directory, and live context usage
-(`plan · ~/proj · 12k/128k · 10%`), fed by `request/context` capacity
-events and per-message token usage. The message pane stays decoration-free
-and both panes keep normal vim statuslines. Chat buffer locals: `q` closes, `i`
-jumps to input, `<Tab>` toggles tool-result folds, `J`/`K` jump between message
-blocks (tool outputs unfold), `s` opens the message scanner. Input: `<C-s>` sends
-(insert and normal mode), `<CR>` is a plain newline in insert mode and sends
-in normal mode. If your global "tab" keys operate on buffers (e.g. barbar),
-set `keys.tabnext`/`keys.tabprev` so they switch real tabpages inside the
-panel.
-
-## Runtime connection
-
-The runtime connects when the panel opens (`dsh.auto_connect`). `dsh.cmd`
-sets the argv explicitly; otherwise an installed `dsh` is used, then the
-managed bootstrap runtime, then a `~/workspace/deepseek-harness` source
-checkout via pnpm. With nothing resolvable, first use offers to download a
-pinned Node.js (`dsh.node_version`) and `@deepseek-ai/dsh` (`dsh.version`)
-into `stdpath("data")/ndsh/bootstrap`; `:NDSHInstallRuntime` repeats or
-repairs that install. Provider and
-model default to `deepseek-official` / `deepseek-flash` and are
-configurable. Credentials: run `:NDSHConnect` to pick a provider, enter its
-API key, then choose a model from the provider's live catalog (fetched over
-HTTP when the provider supports it; free text otherwise). They are stored
-owner-only at
-`stdpath("data")/ndsh/credentials.json` and injected into the runtime's
-environment at spawn (like `opencode auth login`). Environment variables
-already present when Neovim launches (e.g. `DEEPSEEK_API_KEY`) also work
-without connecting. `:NDSHModel` switches between the configured routes and
-any connected providers; the selection persists across restarts. Because the
-SDK fixes provider/model at `initialize`, switching restarts the runtime —
-and live sessions re-enter via `session/resume`, continuing with their full
-context on the new route. Extra routes can be declared via `dsh.models`, e.g.
-`{ provider = "anthropic", model = "claude-opus-4-1", label = "Claude Opus" }`.
-
-## Test
+## Development
 
 ```sh
 nvim --headless -u NONE -l tests/deps.lua                                     # dependency tripwire
@@ -167,5 +107,10 @@ nvim --headless -u NONE --cmd "set rtp+=." -l tests/restart.lua     # persistenc
 nvim --headless -u NONE --cmd "set rtp+=." -l tests/integration.lua # full stack vs tests/fixtures/fake_dsh.py
 ```
 
-Dependencies are inventoried in [docs/dependencies.md](docs/dependencies.md)
-and updated in the same commit that introduces one.
+CI runs all six suites headlessly on every push. Dependencies are
+inventoried in [docs/dependencies.md](docs/dependencies.md) and updated in
+the same commit that introduces one.
+
+## License
+
+MIT

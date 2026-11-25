@@ -17,8 +17,13 @@ local function check(name, cond)
   end
 end
 
--- Auto-answer approvals with the first choice ("Allow once").
-vim.ui.select = function(items, _, on_choice)
+-- Auto-answer approvals with the first choice ("Allow once"), capturing
+-- the approval prompt for the card assertion below.
+local approval_prompt
+vim.ui.select = function(items, opts, on_choice)
+  if opts and type(opts.prompt) == "string" and opts.prompt:find("allow", 1, true) then
+    approval_prompt = opts.prompt
+  end
   on_choice(items[1], 1)
 end
 
@@ -114,10 +119,10 @@ check("reasoning content folded closed", reasoning_folded)
 
 -- Chrome: everything except the session name lives on the chat (input)
 -- pane winbar — model left, cwd and context usage right. The message pane
--- winbar carries the session name.
+-- winbar carries the session name (auto-titled from the first prompt).
 check(
-  "message pane winbar shows session name",
-  winbar_text(vim.fn.bufwinid(chat_buf)):find("chat 1", 1, true) ~= nil
+  "message pane winbar shows the auto-titled session name",
+  winbar_text(vim.fn.bufwinid(chat_buf)):find("integration hello", 1, true) ~= nil
 )
 local input_winbar = winbar_text(input_win)
 check(
@@ -128,6 +133,7 @@ check(
   "chat winbar shows context usage right-aligned",
   input_winbar:find("%= .*12k/128k · 10%%%%") ~= nil
 )
+check("chat winbar shows reasoning effort", input_winbar:find("auto", 1, true) ~= nil)
 
 local back_idle = vim.wait(5000, function()
   return has_status(input_win, "idle")
@@ -140,6 +146,10 @@ local approved = vim.wait(10000, function()
   return chat_text():find("approval outcome: allowed%-once") ~= nil
 end, 100)
 check("approval request answered and rendered", approved)
+check(
+  "approval card shows the tool arguments",
+  approval_prompt ~= nil and approval_prompt:find("needs%-approval") ~= nil
+)
 -- The turn settles (turn/end, status idle) just after the outcome event;
 -- synchronize before the restart so it cannot kill the runtime mid-turn.
 local settled = vim.wait(5000, function()
@@ -195,7 +205,7 @@ check(
 )
 check(
   "winbar shows the second session name",
-  winbar_text(vim.fn.bufwinid(chat2_buf)):find("chat 2", 1, true) ~= nil
+  winbar_text(vim.fn.bufwinid(chat2_buf)):find("second conversation here", 1, true) ~= nil
 )
 
 -- 5. /rename is local: renames the conversation, hits no wire.
@@ -227,7 +237,7 @@ check("input pane highlights local slash commands", has_match)
 -- 6. The navigator (vim.ui fallback) switches the panel back to chat 1.
 vim.ui.select = function(items, _, on_choice)
   for i, item in ipairs(items) do
-    if item.name == "chat 1" then
+    if item.name == "integration hello" then
       on_choice(item, i)
       return
     end
@@ -281,7 +291,7 @@ check(
 -- Back to chat 1 so the sections below find it active.
 vim.ui.select = function(items, _, on_choice)
   for i, item in ipairs(items) do
-    if item.name == "chat 1" then
+    if item.name == "integration hello" then
       on_choice(item, i)
       return
     end

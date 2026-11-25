@@ -43,6 +43,10 @@ vim.api.nvim_create_user_command("NDSHModel", function()
   require("ndsh").select_model()
 end, { desc = "Select the active model" })
 
+vim.api.nvim_create_user_command("NDSHReasoning", function()
+  require("ndsh").select_reasoning_effort()
+end, { desc = "Select the reasoning effort" })
+
 vim.api.nvim_create_user_command("NDSHNew", function(args)
   require("ndsh").new_session(args.args ~= "" and args.args or nil)
 end, { desc = "New ndsh session (optional name)", nargs = "?" })

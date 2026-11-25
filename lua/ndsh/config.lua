@@ -25,6 +25,7 @@ M.defaults = {
     messages = nil, ---@type string|nil
     resume = nil, ---@type string|nil
     model = nil, ---@type string|nil
+    reasoning = nil, ---@type string|nil
     new_session = nil, ---@type string|nil
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
@@ -65,7 +66,12 @@ M.defaults = {
     --- Extra routes offered by :NDSHModel, e.g.
     --- { provider = "anthropic", model = "claude-sonnet-4-5", label = "Claude Sonnet" }.
     models = {}, ---@type table[]
+    --- Reasoning effort sent at initialize; nil = server default. Switch it
+    --- with :NDSHReasoning (restarts the runtime, like the model route).
     reasoning_effort = nil, ---@type string|nil
+    --- Effort levels offered by :NDSHReasoning; ids are adapter-owned (the
+    --- DeepSeek adapter supports off/low/high/max).
+    reasoning_efforts = { "off", "low", "high", "max" },
     max_tokens = nil, ---@type integer|nil
     --- Receive approval/request server prompts for every tool grant.
     approval = true,

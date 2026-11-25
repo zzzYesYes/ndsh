@@ -61,22 +61,24 @@ end
 ---The last explicitly selected route, or nil. Stored under a reserved key
 ---separate from credential entries.
 ---@param path string|nil
----@return { provider: string, model: string }|nil
+---@return { provider: string, model: string, reasoning_effort: string|nil }|nil
 function M.current(path)
   local current = M.load(path)._current
   if type(current) == "table" and current.provider and current.model then
-    return { provider = current.provider, model = current.model }
+    return { provider = current.provider, model = current.model, reasoning_effort = current.reasoning_effort }
   end
   return nil
 end
 
 ---Persist the selected route and keep the provider's model in sync.
+---reasoning_effort rides along with the route; nil clears it (auto).
 ---@param provider string
 ---@param model string
 ---@param path string|nil
-function M.set_current(provider, model, path)
+---@param reasoning_effort string|nil
+function M.set_current(provider, model, path, reasoning_effort)
   local store = M.load(path)
-  store._current = { provider = provider, model = model }
+  store._current = { provider = provider, model = model, reasoning_effort = reasoning_effort }
   local entry = store[provider]
   if type(entry) == "table" then
     entry.model = model

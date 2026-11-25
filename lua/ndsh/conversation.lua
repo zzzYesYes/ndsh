@@ -56,6 +56,7 @@ function M.new(cfg, spec, hooks)
     prev_contentful = false,
     status = "idle", ---@type "idle"|"running"
     plan_active = nil, ---@type boolean|nil nil until the first plan/mode event
+    pending_tools = {}, ---@type table<string, { name: string, summary: string, arguments: string|nil }> open tool calls by callId
     route = nil, ---@type { provider: string, model: string }|nil
     context = { used = nil, window = nil }, ---@type { used: integer|nil, window: integer|nil }
     unread = false,
@@ -280,8 +281,10 @@ function M:refresh_chrome()
     end
     local model = self.route and self.route.model or self.cfg.dsh.model
     local right_parts = {}
-    -- Plan/build mode first; unknown (no plan/mode event yet) reads as
-    -- build, the harness default.
+    -- Reasoning effort first ("auto" = server default), then plan/build
+    -- mode; unknown mode (no plan/mode event yet) reads as build, the
+    -- harness default.
+    right_parts[#right_parts + 1] = self.cfg.dsh.reasoning_effort or "auto"
     right_parts[#right_parts + 1] = self.plan_active and "%#NDSHModePlan#plan%*" or "%#NDSHModeBuild#build%*"
     local cwd = vim.uv.cwd()
     cwd = cwd and vim.fn.fnamemodify(cwd, ":~") or ""
@@ -343,8 +346,10 @@ function M:apply_op(op)
   elseif op.op == "end_message" then
     chat.end_message(buf)
   elseif op.op == "tool_begin" then
+    self.pending_tools[op.id] = { name = op.name, summary = op.summary, arguments = op.arguments }
     chat.tool_begin(buf, op.id, op.name, op.summary)
   elseif op.op == "tool_end" then
+    self.pending_tools[op.id] = nil
     chat.tool_end(buf, op.id, op.ok, op.output)
   elseif op.op == "reasoning" then
     chat.reasoning(buf, op.text)

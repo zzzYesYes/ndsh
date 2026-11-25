@@ -16,11 +16,13 @@ end
 ---Open the navigator. Calls on_select(conv) with the chosen conversation.
 ---With on_delete given (telescope path only), <C-d> asks the caller to
 ---delete the highlighted conversation; the done() continuation refreshes
----the list in place.
+---the list in place. get_lines supplies transcript lines for the telescope
+---preview pane.
 ---@param conversations table[] most-recently-active first
 ---@param on_select fun(conv: table)
 ---@param on_delete fun(conv: table, done: fun())|nil
-function M.open(conversations, on_select, on_delete)
+---@param get_lines fun(conv: table): string[]|nil transcript for preview
+function M.open(conversations, on_select, on_delete, get_lines)
   local ok, pickers = pcall(require, "telescope.pickers")
   if not ok then
     vim.ui.select(conversations, {
@@ -34,6 +36,7 @@ function M.open(conversations, on_select, on_delete)
     return
   end
   local finders = require("telescope.finders")
+  local previewers = require("telescope.previewers")
   local conf = require("telescope.config").values
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
@@ -51,6 +54,16 @@ function M.open(conversations, on_select, on_delete)
       prompt_title = "ndsh sessions",
       finder = make_finder(),
       sorter = conf.generic_sorter({}),
+      previewer = previewers.new_buffer_previewer({
+        title = "transcript tail",
+        define_preview = function(self, entry)
+          local lines = (get_lines and get_lines(entry.value)) or { "(no transcript)" }
+          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+          pcall(vim.treesitter.start, self.state.bufnr, "markdown")
+          -- Preview the tail: the recent messages matter most.
+          vim.api.nvim_win_set_cursor(self.state.winid, { math.max(1, #lines), 0 })
+        end,
+      }),
       attach_mappings = function(prompt_bufnr, map)
         actions.select_default:replace(function()
           local entry = action_state.get_selected_entry()

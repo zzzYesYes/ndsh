@@ -87,9 +87,15 @@ def run_query(msg):
 
     outcome = None
     if "approve" in text:
+        # Real runtime order: the tool/call event lands when the call is
+        # admitted, before the approval gates its execution.
+        event(session_id, "tool/call", {
+            "turn": 1, "step": 1, "callId": "c-1", "name": "bash",
+            "arguments": '{"command":"needs-approval"}',
+        })
         send({
             "jsonrpc": "2.0", "id": "srv-1", "method": "approval/request",
-            "params": {"sessionId": session_id, "toolName": "bash", "reason": "fake approval"},
+            "params": {"sessionId": session_id, "toolName": "bash", "callId": "c-1", "reason": "fake approval"},
         })
         # Block until the client's response to srv-1 arrives.
         for line in sys.stdin:
@@ -97,10 +103,6 @@ def run_query(msg):
             if reply.get("id") == "srv-1":
                 outcome = reply.get("result", {}).get("outcome")
                 break
-        event(session_id, "tool/call", {
-            "turn": 1, "step": 1, "callId": "c-1", "name": "bash",
-            "arguments": '{"command":"needs-approval"}',
-        })
         event(session_id, "tool/result", {
             "turn": 1, "step": 1,
             "message": {

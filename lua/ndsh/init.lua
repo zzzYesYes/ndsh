@@ -213,6 +213,7 @@ function M.setup(opts)
     if current then
       state.cfg.dsh.provider = current.provider
       state.cfg.dsh.model = current.model
+      state.cfg.dsh.reasoning_effort = current.reasoning_effort
     end
   end
   -- Restore persisted conversations as detached entries (once per process).
@@ -241,6 +242,7 @@ function M.setup(opts)
   map(state.cfg.keys.messages, M.messages, "Scan ndsh messages")
   map(state.cfg.keys.resume, M.resume_last, "Resume last ndsh session")
   map(state.cfg.keys.model, M.select_model, "Select ndsh model")
+  map(state.cfg.keys.reasoning, M.select_reasoning_effort, "Select ndsh reasoning effort")
   map(state.cfg.keys.new_session, function()
     M.new_session()
   end, "New ndsh session")
@@ -406,6 +408,16 @@ function M.sessions()
   end)
   sessions_ui.open(ordered, goto_conversation, function(conv, done)
     M.delete_session(conv, done)
+  end, function(conv)
+    -- Preview source: the live buffer when it has content, else the
+    -- persisted transcript (detached sessions have empty buffers).
+    if conv.chat_buf and vim.api.nvim_buf_is_valid(conv.chat_buf) then
+      local lines = vim.api.nvim_buf_get_lines(conv.chat_buf, 0, -1, false)
+      if #lines > 1 or (lines[1] or "") ~= "" then
+        return lines
+      end
+    end
+    return persist.load_transcript(state.cfg, conv.id)
   end)
 end
 
@@ -538,6 +550,23 @@ function M._delete_conversation(conv)
   vim.notify(("ndsh: session %q deleted"):format(conv.name), vim.log.levels.INFO)
 end
 
+---@param conv table
+---@param text string
+local function auto_title(conv, text)
+  -- Only while the auto name is still in place; user renames are kept.
+  if not conv.name:match("^chat %d+$") then
+    return
+  end
+  local title = vim.trim(text:match("^[^\n]*") or ""):gsub("%s+", " ")
+  if title == "" then
+    return
+  end
+  if vim.fn.strchars(title) > 40 then
+    title = vim.fn.strcharpart(title, 0, 39) .. "…"
+  end
+  conv:rename(title)
+end
+
 ---Echo input locally, then send it on the conversation's wire session.
 ---Accepts (conv, text); a single argument is treated as text on the active
 ---conversation (test and dev harness path).
@@ -551,6 +580,7 @@ function M._on_send(conv, text)
   if commands.run(conv, text) then
     return
   end
+  auto_title(conv, text)
   conv:echo_user(text)
   touch(conv)
   -- Provisional until the first message: a composed prompt makes the
@@ -650,7 +680,10 @@ function M._ensure_runtime()
     end,
     on_approval = function(params, respond)
       local conv = params.sessionId and state.by_id[params.sessionId] or nil
-      prompts.approval(params, respond, conv and conv.name or nil)
+      -- The wire carries no arguments; correlate the callId with the
+      -- tool/call event when it arrived first (real runtime order).
+      local call = conv and params.callId and conv.pending_tools[params.callId] or nil
+      prompts.approval(params, respond, conv and conv.name or nil, call)
     end,
     on_user_question = function(params, respond)
       local conv = params.sessionId and state.by_id[params.sessionId] or nil
@@ -800,7 +833,7 @@ function M.select_model()
     end
   end
   local function apply(provider, model)
-    credentials.set_current(provider, model, state.cfg.store_path)
+    credentials.set_current(provider, model, state.cfg.store_path, state.cfg.dsh.reasoning_effort)
     state.cfg.dsh.provider = provider
     state.cfg.dsh.model = model
     M.restart_session()
@@ -864,6 +897,77 @@ function M.select_model()
   else
     vim.notify("ndsh: fetching model catalogs…", vim.log.levels.INFO)
   end
+end
+
+---Reasoning effort picker (:NDSHReasoning): effort is fixed at initialize
+---like the model route, so switching restarts the runtime and sessions
+---resume on the new effort. "auto" clears the override (server default).
+function M.select_reasoning_effort()
+  ensure_setup()
+  local credentials = require("ndsh.credentials")
+  local current = state.cfg.dsh.reasoning_effort or "auto"
+  local items = {}
+  for _, e in ipairs(state.cfg.dsh.reasoning_efforts) do
+    items[#items + 1] = e
+  end
+  items[#items + 1] = "auto"
+  local function apply(choice)
+    local effort = choice ~= "auto" and choice or nil
+    state.cfg.dsh.reasoning_effort = effort
+    credentials.set_current(state.cfg.dsh.provider, state.cfg.dsh.model, state.cfg.store_path, effort)
+    M.restart_session()
+    for _, conv in ipairs(state.conversations) do
+      conv:refresh_chrome()
+    end
+    vim.notify(
+      ("ndsh: reasoning effort %s — sessions resume on the new effort"):format(choice),
+      vim.log.levels.INFO
+    )
+  end
+  local ok, pickers = pcall(require, "telescope.pickers")
+  if not ok then
+    vim.ui.select(items, {
+      prompt = "ndsh: reasoning effort",
+      format_item = function(item)
+        return item .. (item == current and "  (current)" or "")
+      end,
+    }, function(choice)
+      if choice then
+        apply(choice)
+      end
+    end)
+    return
+  end
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  pickers
+    .new({}, {
+      prompt_title = "ndsh reasoning effort",
+      finder = finders.new_table({
+        results = items,
+        entry_maker = function(item)
+          return {
+            value = item,
+            ordinal = item,
+            display = item .. (item == current and "  ●" or ""),
+          }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          local entry = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if entry then
+            apply(entry.value)
+          end
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 ---Show the runtime's captured stderr log in a scratch split.
