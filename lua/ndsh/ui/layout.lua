@@ -71,6 +71,11 @@ local function show_takeover(cfg, chat_buf, input_buf)
   local prev_buf = vim.api.nvim_win_get_buf(chat_win)
   local prev_contentful = vim.api.nvim_buf_get_name(prev_buf) ~= ""
     or vim.api.nvim_get_option_value("filetype", { buf = prev_buf }) ~= ""
+  -- Keep the replaced buffer alive for close()'s restore: a wipe-hidden
+  -- dashboard would otherwise be gone already, the restore would leave a
+  -- scratch behind, and the NEXT toggle cycle would read that scratch as
+  -- "nothing worth restoring" and quit Neovim under restore = "quit".
+  vim.api.nvim_set_option_value("bufhidden", "hide", { buf = prev_buf })
   vim.api.nvim_win_set_buf(chat_win, chat_buf)
   set_chat_win_options(chat_win)
   local input_win = split_input_below(cfg, input_buf)

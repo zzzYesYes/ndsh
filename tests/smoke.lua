@@ -415,6 +415,25 @@ if vim.api.nvim_win_is_valid(float) then
 end
 ndsh.close()
 
+-- 10c. restore="quit" with a wipe-hidden dashboard (bufhidden=wipe, like
+-- real dashboard plugins): the takeover preserves the replaced buffer, so
+-- repeated toggles restore it instead of degrading to scratch and then
+-- quitting Neovim on the next close.
+ndsh.setup({ restore = "quit", store_path = store_path, dsh = { auto_connect = false } })
+vim.cmd("enew")
+local wipe_dash = vim.api.nvim_get_current_buf()
+vim.api.nvim_buf_set_lines(wipe_dash, 0, -1, false, { "DASH" })
+vim.api.nvim_set_option_value("filetype", "dashboard", { buf = wipe_dash })
+vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = wipe_dash })
+vim.api.nvim_set_option_value("modified", false, { buf = wipe_dash })
+for _ = 1, 3 do
+  ndsh.open()
+  ndsh.close()
+end
+check("wipe dashboard buffer survives toggle cycles", vim.api.nvim_buf_is_valid(wipe_dash))
+check("wipe dashboard restored after toggle cycles", vim.api.nvim_get_current_buf() == wipe_dash)
+ndsh.setup({ restore = "scratch", store_path = store_path, dsh = { auto_connect = false } })
+
 -- 11. restore = "quit" (the default) exits Neovim when the closing panel
 -- is the only pane left. Runs last: a successful close ends the process.
 vim.cmd("enew")
