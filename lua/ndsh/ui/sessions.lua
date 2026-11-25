@@ -14,9 +14,13 @@ local function display(conv)
 end
 
 ---Open the navigator. Calls on_select(conv) with the chosen conversation.
+---With on_delete given (telescope path only), <C-d> asks the caller to
+---delete the highlighted conversation; the done() continuation refreshes
+---the list in place.
 ---@param conversations table[] most-recently-active first
 ---@param on_select fun(conv: table)
-function M.open(conversations, on_select)
+---@param on_delete fun(conv: table, done: fun())|nil
+function M.open(conversations, on_select, on_delete)
   local ok, pickers = pcall(require, "telescope.pickers")
   if not ok then
     vim.ui.select(conversations, {
@@ -33,26 +37,49 @@ function M.open(conversations, on_select)
   local conf = require("telescope.config").values
   local actions = require("telescope.actions")
   local action_state = require("telescope.actions.state")
-  pickers.new({}, {
-    prompt_title = "ndsh sessions",
-    finder = finders.new_table({
-      results = conversations,
+  local results = conversations
+  local function make_finder()
+    return finders.new_table({
+      results = results,
       entry_maker = function(conv)
         return { value = conv, display = display(conv), ordinal = conv.name }
       end,
-    }),
-    sorter = conf.generic_sorter({}),
-    attach_mappings = function(prompt_bufnr)
-      actions.select_default:replace(function()
-        local entry = action_state.get_selected_entry()
-        actions.close(prompt_bufnr)
-        if entry then
-          on_select(entry.value)
+    })
+  end
+  pickers
+    .new({}, {
+      prompt_title = "ndsh sessions",
+      finder = make_finder(),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr, map)
+        actions.select_default:replace(function()
+          local entry = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          if entry then
+            on_select(entry.value)
+          end
+        end)
+        if on_delete then
+          map({ "i", "n" }, "<C-d>", function()
+            local entry = action_state.get_selected_entry()
+            if not entry then
+              return
+            end
+            on_delete(entry.value, function()
+              for i, c in ipairs(results) do
+                if c == entry.value then
+                  table.remove(results, i)
+                  break
+                end
+              end
+              action_state.get_current_picker(prompt_bufnr):refresh(make_finder(), { reset_prompt = false })
+            end)
+          end)
         end
-      end)
-      return true
-    end,
-  }):find()
+        return true
+      end,
+    })
+    :find()
 end
 
 return M

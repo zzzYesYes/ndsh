@@ -17,6 +17,14 @@ local registry = {
       vim.notify(("ndsh: session renamed to %s"):format(args), vim.log.levels.INFO)
     end,
   },
+  new = {
+    desc = "New session (optional name)",
+    run = function(_, args)
+      local conv = require("ndsh").new_session(args ~= "" and args or nil)
+      -- /new comes from the input pane; land the user in the new one.
+      conv:focus_input()
+    end,
+  },
 }
 
 ---Registered LOCAL command names, for the highlight pattern.

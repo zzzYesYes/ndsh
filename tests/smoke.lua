@@ -50,6 +50,16 @@ for _, win in ipairs(wins) do
   end
 end
 check("input buffer exists", input_buf ~= nil)
+
+-- 1b. A bare setup registers no leader mappings, and opening the panel
+-- alone persists nothing: sessions are provisional until their first
+-- message.
+local sessions_file = vim.fn.fnamemodify(store_path, ":h") .. "/sessions.json"
+check(
+  "no default leader mappings",
+  vim.fn.maparg("<leader>ant", "n") == "" and vim.fn.maparg("<leader>ans", "n") == "" and vim.fn.maparg("<leader>ann", "n") == ""
+)
+check("opening the panel writes no sessions file", vim.fn.filereadable(sessions_file) == 0)
 if input_buf then
   check(
     "input window height is fixed at 6",
@@ -107,6 +117,12 @@ local fold_ok = vim.api.nvim_win_call(chat_win, function()
   return false
 end)
 check("tool result folded closed", fold_ok)
+
+check(
+  "first message persists the session",
+  vim.fn.filereadable(sessions_file) == 1
+    and table.concat(vim.fn.readfile(sessions_file), "\n"):find("chat 1", 1, true) ~= nil
+)
 
 -- 3b. The message scanner enumerates the rendered transcript, newest
 -- first; selecting an entry jumps the chat window to it. Telescope is
@@ -373,6 +389,18 @@ end)
 check("deleting a panel buffer closes the panel", not ndsh.is_open())
 ndsh.open()
 check("reopen rebuilds panel buffers", ndsh.is_open() and #vim.api.nvim_tabpage_list_wins(0) == 3)
+ndsh.close()
+
+-- 10b. Deleting the last session lands on a fresh provisional one.
+ndsh.open()
+vim.ui.select = function(_, _, cb)
+  cb("Delete", 1)
+end
+ndsh.delete_session()
+vim.ui.select = function(_, _, cb)
+  cb(nil)
+end
+check("deleting the last session opens a fresh one", ndsh.is_open())
 ndsh.close()
 
 -- 11. restore = "quit" (the default) exits Neovim when the closing panel

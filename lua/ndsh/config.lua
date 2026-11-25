@@ -16,17 +16,16 @@ M.defaults = {
     --- Send from the input buffer (insert and normal mode). Normal-mode
     --- <CR> also sends; insert-mode <CR> is always a plain newline.
     send = { "<C-s>" },
-    --- Global toggle mapping in normal mode; nil to define your own.
-    toggle = "<leader>ant",
-    --- Session navigator and new-session mappings; nil to define your own.
-    sessions = "<leader>ans",
-    new_session = "<leader>ann",
-    --- Transcript message scanner; nil to define your own.
-    messages = "<leader>anm",
-    --- Resume the most recently active session; nil to define your own.
-    resume = "<leader>anr",
-    --- Model selector; nil to define your own.
-    model = "<leader>anM",
+    --- No default keybindings: leader combos are user config. Bind in
+    --- setup(), e.g. keys = { toggle = "<leader>ant", sessions =
+    --- "<leader>ans", messages = "<leader>anm", resume = "<leader>anr",
+    --- model = "<leader>anM", new_session = "<leader>ann" }.
+    toggle = nil, ---@type string|nil
+    sessions = nil, ---@type string|nil
+    messages = nil, ---@type string|nil
+    resume = nil, ---@type string|nil
+    model = nil, ---@type string|nil
+    new_session = nil, ---@type string|nil
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
     --- are meaningless inside the reserved panel windows, so bind them to

@@ -255,6 +255,42 @@ local plan_off = vim.wait(10000, function()
 end, 100)
 check("winbar returns to build after /plan off", plan_off)
 
+-- 6d. /new creates a named session locally without touching the wire, and
+-- the session stays provisional (unpersisted) until its first message.
+ndsh._on_send("/new named-test")
+local named_buf = find_chat_buf()
+check("/new swaps the panel to the new session", named_buf ~= nil and named_buf ~= chat_buf)
+check(
+  "/new names the session",
+  named_buf ~= nil and winbar_text(vim.fn.bufwinid(named_buf)):find("named%-test") ~= nil
+)
+check("/new never hits the wire", chat_text():find("FAKE%-OUTRO: /new") == nil)
+check(
+  "unsent session stays out of the store",
+  not table.concat(vim.fn.readfile(store_dir .. "/sessions.json"), "\n"):find("named%-test")
+)
+ndsh._on_send("provisional check")
+local named_served = vim.wait(10000, function()
+  return table.concat(vim.api.nvim_buf_get_lines(named_buf, 0, -1, false), "\n"):find("FAKE%-OUTRO: provisional check") ~= nil
+end, 100)
+check("first message served in the new session", named_served)
+check(
+  "first message persists the session",
+  table.concat(vim.fn.readfile(store_dir .. "/sessions.json"), "\n"):find("named%-test") ~= nil
+)
+-- Back to chat 1 so the sections below find it active.
+vim.ui.select = function(items, _, on_choice)
+  for i, item in ipairs(items) do
+    if item.name == "chat 1" then
+      on_choice(item, i)
+      return
+    end
+  end
+  on_choice(nil, nil)
+end
+ndsh.sessions()
+check("navigator returns to chat 1", vim.fn.bufwinid(chat_buf) ~= -1)
+
 -- 6b. Persistence: a stored session restores detached and resumes on
 -- activation; deletion removes it everywhere.
 vim.ui.select = function(items, _, on_choice)

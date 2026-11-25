@@ -16,8 +16,24 @@ With lazy.nvim:
 ```lua
 {
   "zzzYesYes/ndsh",
-  dependencies = { "nvim-telescope/telescope.nvim" }, -- optional, better session picker
+  dependencies = { "nvim-telescope/telescope.nvim" }, -- optional, better pickers
   opts = {},
+}
+```
+
+ndsh defines no keybindings on its own — bind the actions you want via
+`keys` (all commands stay available regardless):
+
+```lua
+opts = {
+  keys = {
+    toggle = "<leader>ant",      -- open/close the panel
+    sessions = "<leader>ans",    -- session navigator (<C-d> deletes an entry)
+    messages = "<leader>anm",    -- scan the transcript
+    resume = "<leader>anr",      -- jump back into the last session
+    model = "<leader>anM",       -- model selector
+    new_session = "<leader>ann", -- or use /new in the input
+  },
 }
 ```
 
@@ -46,11 +62,11 @@ and intentionally not pinned down there).
 
 | Command | Action |
 |---|---|
-| `:NDSHToggle` | Toggle the panel (default map: `<leader>ant`) |
-| `:NDSHNew [name]` | New session in the panel (`<leader>ann`) |
-| `:NDSHResume` | Resume the most recently active session (`<leader>anr`) |
-| `:NDSHSessions` | Session navigator (`<leader>ans`, telescope or `vim.ui`) |
-| `:NDSHMessages` | Scan transcript messages and jump to one (`<leader>anm`, or `s` in the chat pane) |
+| `:NDSHToggle` | Toggle the panel |
+| `:NDSHNew [name]` | New session in the panel (or `/new [name]` in the input) |
+| `:NDSHResume` | Resume the most recently active session |
+| `:NDSHSessions` | Session navigator (telescope or `vim.ui`; `<C-d>` deletes an entry) |
+| `:NDSHMessages` | Scan transcript messages and jump to one (`s` in the message pane) |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>` in the input) |
 | `:NDSHDelete` | Delete the current session (with confirmation) |
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
@@ -69,7 +85,7 @@ and each session keeps its own transcript, status, and wire session in the
 background. The message pane's winbar shows the session name (with an
 unread ● when activity arrives while hidden); the input pane's winbar keeps
 status, model, working directory, and context usage. Closing the panel
-detaches the session — transcripts persist and `<leader>ans` brings it back.
+detaches the session — transcripts persist and the navigator brings it back.
 All sessions share the runtime's provider/model (an SDK limitation; see
 docs/upstream-sdk-plan.md). `/rename <name>` in the input renames the
 current session locally; other slash commands pass through to the runtime.
@@ -80,7 +96,7 @@ The registry persists to `sessions.json` beside the store, so sessions
 survive nvim restarts (`persist_sessions = true` by default), and each
 session's rendered transcript is saved to `transcripts/<id>.md` beside it
 (on exit and at every turn end). Restored sessions appear in the navigator
-as detached entries; `<leader>anr` (`:NDSHResume`) jumps straight back into
+as detached entries; `:NDSHResume` jumps straight back into
 the most recently active one. Activating a restored session reloads its
 transcript and calls `session/resume` on the wire — the agent continues
 with its full context (no history read on the wire yet; see

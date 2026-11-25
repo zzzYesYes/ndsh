@@ -42,6 +42,7 @@ Slash input is highlighted live while typing and completes with <C-x><C-u>.
 
 Local commands — handled by the plugin, never sent to the wire:
 
+  /new [name]        Create a session and swap the panel to it
   /rename {name}     Rename the current session (shown on its winbar)
 
 Runtime commands — routed natively by the dsh SDK profile (verified
@@ -65,7 +66,8 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHClose         Close the panel
   :NDSHNew [name]    Create a session and swap the panel to it
   :NDSHResume        Resume the most recently active session
-  :NDSHSessions      Session navigator (telescope or vim.ui picker)
+  :NDSHSessions      Session navigator (telescope or vim.ui picker;
+                     <C-d> in the telescope picker deletes an entry)
   :NDSHMessages      Scan transcript messages and jump to one
   :NDSHRename [name] Rename the current session
   :NDSHDelete        Delete the current session (asks for confirmation)
@@ -96,16 +98,31 @@ With nothing resolvable, first use offers to bootstrap the managed runtime
 (needs curl, tar, sha256sum); :NDSHInstallRuntime repeats or repairs it.
 
                                                           *ndsh-config-keys*
-Key mappings are fields under keys = {} and are intentionally user-owned:
+Key mappings are fields under keys = {} and are intentionally user-owned.
+ALL of them default to nil: ndsh defines no global mappings on its own.
   keys.toggle       panel toggle
   keys.sessions     session navigator
   keys.messages     transcript message scanner
   keys.resume       resume the most recently active session
   keys.model        model selector
   keys.new_session  new session
-  keys.send         list of send keys in the input pane
+  keys.send         list of send keys in the input pane (default <C-s>)
   keys.tabnext      tabpage navigation inside panel windows
   keys.tabprev      tabpage navigation inside panel windows
+
+Example:
+>
+  require("ndsh").setup({
+    keys = {
+      toggle = "<leader>ant",
+      sessions = "<leader>ans",
+      messages = "<leader>anm",
+      resume = "<leader>anr",
+      model = "<leader>anM",
+      new_session = "<leader>ann",
+    },
+  })
+<
 
 ==============================================================================
 CHROME                                                          *ndsh-chrome*

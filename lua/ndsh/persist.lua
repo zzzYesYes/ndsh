@@ -45,6 +45,11 @@ end
 ---@param sessions NdsStoredSession[]
 function M.save(cfg, sessions)
   local path = store_path(cfg)
+  -- No placeholder files for a registry of only provisional sessions; an
+  -- existing file still updates (e.g. empty after deleting the last one).
+  if #sessions == 0 and vim.fn.filereadable(path) ~= 1 then
+    return
+  end
   vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
   vim.fn.writefile({ vim.json.encode({ sessions = sessions }) }, path)
   -- Session metadata is not secret, but keep the store owner-only anyway.

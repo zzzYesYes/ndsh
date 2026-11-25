@@ -68,20 +68,24 @@ local function touch(conv)
 end
 
 ---Persist the registry (create/rename/delete/activate; not every touch).
+---Provisional conversations — created this process, never sent on the wire
+--- — are skipped, so toggling around never litters the store with empties.
 local function persist_save()
   if not state.cfg.persist_sessions then
     return
   end
   local entries = {}
   for _, conv in ipairs(state.conversations) do
-    entries[#entries + 1] = {
-      id = conv.id,
-      name = conv.name,
-      created = conv.created,
-      last_active = conv.last_active or conv.created,
-      cwd = conv.cwd,
-      plan_active = conv.plan_active,
-    }
+    if conv.wire_touched or conv.stored then
+      entries[#entries + 1] = {
+        id = conv.id,
+        name = conv.name,
+        created = conv.created,
+        last_active = conv.last_active or conv.created,
+        cwd = conv.cwd,
+        plan_active = conv.plan_active,
+      }
+    end
   end
   persist.save(state.cfg, entries)
 end
@@ -163,6 +167,7 @@ local function new_conversation(name, stored)
   conv.created = stored and stored.created or os.time()
   conv.last_active = stored and stored.last_active or conv.created
   conv.cwd = stored and stored.cwd or vim.uv.cwd()
+  conv.stored = stored ~= nil -- came from disk: always persists
   if stored then
     conv.plan_active = stored.plan_active
   end
@@ -399,7 +404,9 @@ function M.sessions()
   table.sort(ordered, function(a, b)
     return (state.activity[a.id] or 0) > (state.activity[b.id] or 0)
   end)
-  sessions_ui.open(ordered, goto_conversation)
+  sessions_ui.open(ordered, goto_conversation, function(conv, done)
+    M.delete_session(conv, done)
+  end)
 end
 
 ---Reactivate the most recently active session (:NDSHResume): a restored
@@ -463,12 +470,14 @@ function M.rename(name)
   end)
 end
 
----Delete a conversation (:NDSHDelete): confirm, then remove it from the
----registry, wipe its transcript buffers, and drop its persisted record.
----The wire session keeps running in the runtime until the next restart —
----the SDK has no session/close (see docs/upstream-sdk-plan.md).
+---Delete a conversation (:NDSHDelete and <C-d> in the navigator): confirm,
+---then remove it from the registry, wipe its transcript buffers, and drop
+---its persisted record. The wire session keeps running in the runtime until
+---the next restart — the SDK has no session/close (see
+---docs/upstream-sdk-plan.md). on_done fires after a confirmed delete.
 ---@param target table|nil defaults to the active conversation
-function M.delete_session(target)
+---@param on_done fun()|nil
+function M.delete_session(target, on_done)
   ensure_setup()
   local conv = target or state.active
   if not conv then
@@ -482,6 +491,9 @@ function M.delete_session(target)
       return
     end
     M._delete_conversation(conv)
+    if on_done then
+      on_done()
+    end
   end)
 end
 
@@ -506,7 +518,9 @@ function M._delete_conversation(conv)
   end
   if state.active == conv then
     state.active = nil
-    -- Fall back to the most recently active remaining conversation.
+    -- Fall back to the most recently active remaining conversation; with
+    -- none left, land on a fresh provisional session so the panel never
+    -- sits on a corpse.
     local best, best_stamp = nil, -1
     for _, c in ipairs(state.conversations) do
       local stamp = state.activity[c.id] or 0
@@ -516,6 +530,8 @@ function M._delete_conversation(conv)
     end
     if best then
       goto_conversation(best)
+    else
+      M.new_session()
     end
   end
   persist_save()
@@ -537,6 +553,11 @@ function M._on_send(conv, text)
   end
   conv:echo_user(text)
   touch(conv)
+  -- Provisional until the first message: a composed prompt makes the
+  -- session real even when the runtime is down (it fails over to a fresh
+  -- wire id on resume, transcript kept).
+  conv.wire_touched = true
+  persist_save()
   if not state.runtime then
     vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
     return
@@ -546,12 +567,10 @@ function M._on_send(conv, text)
     -- silently create a fresh wire session under the same id. The prompt
     -- sends once the resume settles (on the new id if it failed over).
     resume_conversation(conv, function()
-      conv.wire_touched = true
       state.runtime:send(conv.id, text)
     end)
     return
   end
-  conv.wire_touched = true
   state.runtime:send(conv.id, text)
 end
 
