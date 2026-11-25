@@ -30,7 +30,7 @@ end
 local catalog = require("ndsh.models_catalog")
 catalog.fetch = function(provider, _, cb)
   if provider.id == "deepseek-official" then
-    cb({ "deepseek-v4-flash", "deepseek-v4-pro" })
+    cb({ "deepseek-flash", "deepseek-v4-pro" })
   else
     cb(nil)
   end
@@ -54,7 +54,7 @@ select_pick = 1
 ndsh.connect()
 
 local entry = credentials.get("deepseek-official", store_path)
-check("connect stores env and model", entry ~= nil and entry.env.DEEPSEEK_API_KEY == "sk-validation" and entry.model == "deepseek-v4-flash")
+check("connect stores env and model", entry ~= nil and entry.env.DEEPSEEK_API_KEY == "sk-validation" and entry.model == "deepseek-flash")
 local current = credentials.current(store_path)
 check("connect records current route", current ~= nil and current.provider == "deepseek-official")
 check("connect restarts the runtime", restarted == 1)

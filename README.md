@@ -125,7 +125,7 @@ checkout via pnpm. With nothing resolvable, first use offers to download a
 pinned Node.js (`dsh.node_version`) and `@deepseek-ai/dsh` (`dsh.version`)
 into `stdpath("data")/ndsh/bootstrap`; `:NDSHInstallRuntime` repeats or
 repairs that install. Provider and
-model default to `deepseek-official` / `deepseek-v4-flash` and are
+model default to `deepseek-official` / `deepseek-flash` and are
 configurable. Credentials: run `:NDSHConnect` to pick a provider, enter its
 API key, then choose a model from the provider's live catalog (fetched over
 HTTP when the provider supports it; free text otherwise). They are stored

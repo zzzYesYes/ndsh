@@ -62,7 +62,7 @@ M.defaults = {
     version = "0.2.2-rc.5",
     node_version = "26.13.1",
     provider = "deepseek-official",
-    model = "deepseek-v4-flash",
+    model = "deepseek-flash",
     --- Extra routes offered by :NDSHModel, e.g.
     --- { provider = "anthropic", model = "claude-sonnet-4-5", label = "Claude Sonnet" }.
     models = {}, ---@type table[]
@@ -82,7 +82,7 @@ M.defaults = {
   --- discovery via the provider's catalog endpoint (all three answer with
   --- OpenAI's { data = [ { id } ] } shape).
   providers = {
-    { id = "deepseek-official", label = "DeepSeek (official)", env = { "DEEPSEEK_API_KEY" }, default_model = "deepseek-v4-flash", models_url = "https://api.deepseek.com/models", auth = "bearer" },
+    { id = "deepseek-official", label = "DeepSeek (official)", env = { "DEEPSEEK_API_KEY" }, default_model = "deepseek-flash", models_url = "https://api.deepseek.com/models", auth = "bearer" },
     { id = "anthropic", label = "Anthropic", env = { "ANTHROPIC_API_KEY" }, default_model = "claude-sonnet-4-5", models_url = "https://api.anthropic.com/v1/models", auth = "anthropic" },
     { id = "openai", label = "OpenAI", env = { "OPENAI_API_KEY" }, default_model = "gpt-5", models_url = "https://api.openai.com/v1/models", auth = "bearer" },
   },
