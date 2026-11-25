@@ -1,0 +1,25 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Neovim
+        run: |
+          curl -fSL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz -o nvim.tar.gz
+          sudo tar -xzf nvim.tar.gz -C /usr/local --strip-components=1
+          nvim --version
+
+      - name: Run suites
+        run: |
+          for t in deps unit smoke features restart integration; do
+            echo "== $t =="
+            nvim --headless -u NONE --cmd "set rtp+=." -l "tests/$t.lua" || exit 1
+          done
