@@ -97,6 +97,33 @@ marked = nil
 ndsh.select_model()
 check("explicit config wins over stored route", marked == nil)
 
+-- 5. Custom model entry: any model name on a connected provider, without
+-- re-entering credentials (stored env is reused).
+ndsh.setup({ store_path = store_path, dsh = { auto_connect = false } })
+local custom_entry
+vim.ui.select = function(items, _, on_choice)
+  for i, item in ipairs(items) do
+    if item.custom then
+      custom_entry = item
+      on_choice(item, i)
+      return
+    end
+  end
+  on_choice(nil, nil)
+end
+input_answers = { "deepseek-v4-pro" }
+ndsh.select_model()
+check(
+  "custom model entry offered for a connected provider",
+  custom_entry ~= nil and custom_entry.provider == "deepseek-official"
+)
+current = credentials.current(store_path)
+check(
+  "custom model switches the route",
+  current ~= nil and current.provider == "deepseek-official" and current.model == "deepseek-v4-pro"
+)
+check("custom model restarts the runtime", restarted == 3)
+
 ndsh.restart_session = orig_restart
 vim.fn.delete(store_dir, "rf")
 

@@ -136,6 +136,82 @@ if #scanned == 3 then
   )
 end
 
+-- 3b2. Telescope swaps the preview window's buffer on a later tick, so the
+-- preview cursor jump must be deferred: setting it during define_preview
+-- aims at the buffer the window still shows (a one-line scratch buffer on
+-- the first preview) and raises "Invalid cursor line". Stub telescope well
+-- enough to capture the previewer and drive it against a stale window.
+do
+  local previewer
+  local stubs = {
+    ["telescope.pickers"] = { new = function(_, opts)
+      return { opts = opts, find = function() end }
+    end },
+    ["telescope.finders"] = { new_table = function(o) return o end },
+    ["telescope.previewers"] = { new_buffer_previewer = function(o)
+      previewer = o
+      return o
+    end },
+    ["telescope.pickers.entry_display"] = { create = function() return function() end end },
+    ["telescope.config"] = { values = { generic_sorter = function() return nil end } },
+    ["telescope.actions"] = {
+      select_default = { replace = function() end },
+      close = function() end,
+    },
+    ["telescope.actions.state"] = { get_selected_entry = function() end },
+  }
+  local loaded = {}
+  for mod, impl in pairs(stubs) do
+    loaded[mod] = package.loaded[mod]
+    package.preload[mod] = function()
+      return impl
+    end
+    package.loaded[mod] = nil
+  end
+
+  local src = vim.api.nvim_create_buf(false, true)
+  local lines = { "❯ You", "hello", "● ndsh", "hi there" }
+  for i = 1, 26 do
+    lines[#lines + 1] = "pad " .. i
+  end
+  vim.api.nvim_buf_set_lines(src, 0, -1, false, lines)
+  require("ndsh.ui.messages").open({ chat_buf = src, name = "test" }, function() end)
+  check("preview: picker wires a previewer", previewer and previewer.define_preview ~= nil)
+
+  local stale = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(stale, 0, -1, false, { "stale preview" })
+  local pwin = vim.api.nvim_open_win(stale, false, {
+    relative = "editor",
+    row = 1,
+    col = 1,
+    width = 20,
+    height = 5,
+  })
+  local pbuf = vim.api.nvim_create_buf(false, true)
+  local entry = { value = { lnum = 3 } }
+  local ok = pcall(previewer.define_preview, { state = { bufnr = pbuf, winid = pwin } }, entry)
+  check("preview: cursor jump against a stale preview buffer does not error", ok)
+  check("preview: stale window buffer keeps its cursor", vim.api.nvim_win_get_cursor(pwin)[1] == 1)
+
+  vim.api.nvim_win_set_buf(pwin, pbuf)
+  local ok2 = pcall(previewer.define_preview, { state = { bufnr = pbuf, winid = pwin } }, entry)
+  check("preview: cursor jump on the installed buffer does not error", ok2)
+  vim.wait(200, function()
+    return vim.api.nvim_win_is_valid(pwin) and vim.api.nvim_win_get_cursor(pwin)[1] == 3
+  end)
+  check("preview: cursor lands on the selected block", vim.api.nvim_win_get_cursor(pwin)[1] == 3)
+  check("preview: transcript copied into the preview buffer", vim.api.nvim_buf_line_count(pbuf) == #lines)
+
+  vim.api.nvim_win_close(pwin, true)
+  vim.api.nvim_buf_delete(pbuf, { force = true })
+  vim.api.nvim_buf_delete(stale, { force = true })
+  vim.api.nvim_buf_delete(src, { force = true })
+  for mod in pairs(stubs) do
+    package.preload[mod] = nil
+    package.loaded[mod] = loaded[mod]
+  end
+end
+
 -- 3c. J/K in the message pane jump between transcript blocks; the maps are
 -- buffer-local and never leak to the input pane or file buffers.
 local chat_win3 = vim.fn.bufwinid(chat_buf)

@@ -235,6 +235,7 @@ function M.setup(opts)
   map(state.cfg.keys.sessions, M.sessions, "Navigate ndsh sessions")
   map(state.cfg.keys.messages, M.messages, "Scan ndsh messages")
   map(state.cfg.keys.resume, M.resume_last, "Resume last ndsh session")
+  map(state.cfg.keys.model, M.select_model, "Select ndsh model")
   map(state.cfg.keys.new_session, function()
     M.new_session()
   end, "New ndsh session")
@@ -677,9 +678,11 @@ function M.connect()
 end
 
 ---Model picker (:NDSHModel): candidates are the active route, configured
----dsh.models entries, and every connected provider's stored model. The
----selection persists and the runtime restarts on the new route (the SDK
----fixes provider/model at initialize, so switching means a new session).
+---dsh.models entries, every connected provider's stored model, and one
+---"other model…" entry per connected provider for switching to any model
+---name without re-entering credentials. The selection persists and the
+---runtime restarts on the new route (the SDK fixes provider/model at
+---initialize, so switching means a new session).
 function M.select_model()
   ensure_setup()
   local credentials = require("ndsh.credentials")
@@ -697,7 +700,8 @@ function M.select_model()
     candidates[#candidates + 1] = {
       provider = provider,
       model = model,
-      label = label or (provider .. " / " .. model),
+      label = label,
+      current = provider == state.cfg.dsh.provider and model == state.cfg.dsh.model,
     }
   end
   add(state.cfg.dsh.provider, state.cfg.dsh.model)
@@ -709,21 +713,34 @@ function M.select_model()
       add(provider, entry.model)
     end
   end
-  vim.ui.select(candidates, {
-    prompt = "ndsh: select model",
-    format_item = function(item)
-      local active = item.provider == state.cfg.dsh.provider and item.model == state.cfg.dsh.model
-      return item.label .. (active and "  (current)" or "")
-    end,
-  }, function(choice)
-    if not choice then
+  -- One free-text entry per connected provider: any model name, stored
+  -- credentials untouched.
+  for provider, entry in pairs(store) do
+    if provider ~= "_current" and type(entry) == "table" then
+      candidates[#candidates + 1] = { provider = provider, custom = true }
+    end
+  end
+  local function apply(provider, model)
+    credentials.set_current(provider, model, state.cfg.store_path)
+    state.cfg.dsh.provider = provider
+    state.cfg.dsh.model = model
+    M.restart_session()
+    vim.notify(("ndsh: switched to %s / %s (new session)"):format(provider, model), vim.log.levels.INFO)
+  end
+  require("ndsh.ui.models").open(candidates, function(choice)
+    if choice.custom then
+      vim.ui.input({ prompt = ("Model (%s): "):format(choice.provider) }, function(model)
+        if not model then
+          return
+        end
+        model = model:gsub("^%s+", ""):gsub("%s+$", "")
+        if model ~= "" then
+          apply(choice.provider, model)
+        end
+      end)
       return
     end
-    credentials.set_current(choice.provider, choice.model, state.cfg.store_path)
-    state.cfg.dsh.provider = choice.provider
-    state.cfg.dsh.model = choice.model
-    M.restart_session()
-    vim.notify(("ndsh: switched to %s (new session)"):format(choice.label), vim.log.levels.INFO)
+    apply(choice.provider, choice.model)
   end)
 end
 

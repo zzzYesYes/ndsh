@@ -57,7 +57,7 @@ and intentionally not pinned down there).
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
 | `:NDSHInstallRuntime` | Install the managed runtime (pinned Node.js + `@deepseek-ai/dsh`) |
 | `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
-| `:NDSHModel` | Select the active model (persists; restarts the runtime) |
+| `:NDSHModel` | Select the active model (telescope picker; persists; restarts the runtime). Includes an "other model…" entry per connected provider for any model name without re-entering credentials |
 | `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
 

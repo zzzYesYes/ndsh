@@ -228,11 +228,28 @@ function M.open(conv, on_select)
         title = "transcript",
         define_preview = function(self, entry)
           local pbuf = self.state.bufnr
-          vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+          local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+          local lnum = math.min(entry.value.lnum, #lines)
+          vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
           vim.api.nvim_buf_clear_namespace(pbuf, ns, 0, -1)
-          vim.api.nvim_buf_add_highlight(pbuf, ns, "Visual", entry.value.lnum - 1, 0, -1)
+          vim.api.nvim_buf_add_highlight(pbuf, ns, "Visual", lnum - 1, 0, -1)
           pcall(vim.treesitter.start, pbuf, "markdown")
-          vim.api.nvim_win_set_cursor(self.state.winid, { entry.value.lnum, 0 })
+          -- Telescope installs a fresh preview buffer and swaps it into the
+          -- preview window on a later tick. Moving the cursor now would aim
+          -- at whatever buffer the window still shows — often a one-line
+          -- scratch buffer — and fail with "Invalid cursor line". Land the
+          -- jump once the swap has happened; a newer selection (which
+          -- schedules its own swap and jump) or a closed picker is skipped.
+          vim.schedule(function()
+            local win = self.state.winid
+            if not (win and vim.api.nvim_win_is_valid(win) and vim.api.nvim_buf_is_valid(pbuf)) then
+              return
+            end
+            if vim.api.nvim_win_get_buf(win) ~= pbuf then
+              return
+            end
+            pcall(vim.api.nvim_win_set_cursor, win, { lnum, 0 })
+          end)
         end,
       }),
       attach_mappings = function(prompt_bufnr)

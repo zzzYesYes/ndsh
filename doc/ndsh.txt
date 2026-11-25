@@ -101,6 +101,7 @@ Key mappings are fields under keys = {} and are intentionally user-owned:
   keys.sessions     session navigator
   keys.messages     transcript message scanner
   keys.resume       resume the most recently active session
+  keys.model        model selector
   keys.new_session  new session
   keys.send         list of send keys in the input pane
   keys.tabnext      tabpage navigation inside panel windows

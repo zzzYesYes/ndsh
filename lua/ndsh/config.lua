@@ -25,6 +25,8 @@ M.defaults = {
     messages = "<leader>anm",
     --- Resume the most recently active session; nil to define your own.
     resume = "<leader>anr",
+    --- Model selector; nil to define your own.
+    model = "<leader>anM",
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they
     --- are meaningless inside the reserved panel windows, so bind them to
