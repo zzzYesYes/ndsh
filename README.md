@@ -56,7 +56,7 @@ and intentionally not pinned down there).
 | `:NDSHOpen` / `:NDSHClose` | Open / close explicitly |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
 | `:NDSHInstallRuntime` | Install the managed runtime (pinned Node.js + `@deepseek-ai/dsh`) |
-| `:NDSHConnect` | Connect a provider (stores credentials, switches model) |
+| `:NDSHConnect` | Connect a provider (stores credentials; pick from the live model catalog) |
 | `:NDSHModel` | Select the active model (telescope picker; persists; restarts the runtime). Includes an "other model…" entry per connected provider for any model name without re-entering credentials |
 | `:NDSHLog` | Show the captured runtime stderr log |
 | `:NDSHDemo` | Play a scripted session through the real rendering path |
@@ -127,7 +127,9 @@ into `stdpath("data")/ndsh/bootstrap`; `:NDSHInstallRuntime` repeats or
 repairs that install. Provider and
 model default to `deepseek-official` / `deepseek-v4-flash` and are
 configurable. Credentials: run `:NDSHConnect` to pick a provider, enter its
-API key and model — they are stored owner-only at
+API key, then choose a model from the provider's live catalog (fetched over
+HTTP when the provider supports it; free text otherwise). They are stored
+owner-only at
 `stdpath("data")/ndsh/credentials.json` and injected into the runtime's
 environment at spawn (like `opencode auth login`). Environment variables
 already present when Neovim launches (e.g. `DEEPSEEK_API_KEY`) also work

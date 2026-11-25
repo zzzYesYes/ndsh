@@ -17,11 +17,23 @@ local store_path = store_dir .. "/credentials.json"
 -- Stub vim.ui: queued select picks and input answers.
 local select_pick = 1
 local input_answers = {}
+local last_items
 vim.ui.select = function(items, _, on_choice)
+  last_items = items
   on_choice(items[select_pick], select_pick)
 end
 vim.ui.input = function(_, on_submit)
   on_submit(table.remove(input_answers, 1))
+end
+
+-- Model discovery is stubbed: no real HTTP in tests.
+local catalog = require("ndsh.models_catalog")
+catalog.fetch = function(provider, _, cb)
+  if provider.id == "deepseek-official" then
+    cb({ "deepseek-v4-flash", "deepseek-v4-pro" })
+  else
+    cb(nil)
+  end
 end
 
 local credentials = require("ndsh.credentials")
@@ -36,8 +48,8 @@ end
 ndsh.setup({ store_path = store_path, dsh = { auto_connect = false } })
 
 -- 1. Connect flow: pick the first provider (deepseek-official), enter key,
--- accept default model.
-input_answers = { "sk-validation", "deepseek-v4-flash" }
+-- pick the discovered default model from the catalog picker.
+input_answers = { "sk-validation" }
 select_pick = 1
 ndsh.connect()
 
@@ -46,6 +58,11 @@ check("connect stores env and model", entry ~= nil and entry.env.DEEPSEEK_API_KE
 local current = credentials.current(store_path)
 check("connect records current route", current ~= nil and current.provider == "deepseek-official")
 check("connect restarts the runtime", restarted == 1)
+check(
+  "connect model picker lists discovered models",
+  last_items ~= nil and last_items[2] ~= nil and last_items[2].model == "deepseek-v4-pro"
+)
+check("connect model picker keeps a custom entry", last_items ~= nil and last_items[#last_items].custom == true)
 
 -- 2. Model selection: candidates include connected providers; picking the
 -- second candidate (anthropic from the provider registry defaults via the
@@ -101,8 +118,12 @@ check("explicit config wins over stored route", marked == nil)
 -- re-entering credentials (stored env is reused).
 ndsh.setup({ store_path = store_path, dsh = { auto_connect = false } })
 local custom_entry
+local saw_discovered
 vim.ui.select = function(items, _, on_choice)
   for i, item in ipairs(items) do
+    if item.provider == "deepseek-official" and item.model == "deepseek-v4-pro" then
+      saw_discovered = true
+    end
     if item.custom then
       custom_entry = item
       on_choice(item, i)
@@ -113,6 +134,7 @@ vim.ui.select = function(items, _, on_choice)
 end
 input_answers = { "deepseek-v4-pro" }
 ndsh.select_model()
+check("select_model lists discovered models", saw_discovered == true)
 check(
   "custom model entry offered for a connected provider",
   custom_entry ~= nil and custom_entry.provider == "deepseek-official"

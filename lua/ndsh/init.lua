@@ -644,10 +644,7 @@ function M.connect()
     end
     local env = {}
     local function ask_model()
-      vim.ui.input({ prompt = "Model: ", default = provider.default_model or "" }, function(model)
-        if not model or model == "" then
-          return
-        end
+      local function finish(model)
         local credentials = require("ndsh.credentials")
         credentials.set(provider.id, { env = env, model = model }, state.cfg.store_path)
         credentials.set_current(provider.id, model, state.cfg.store_path)
@@ -655,6 +652,36 @@ function M.connect()
         state.cfg.dsh.model = model
         M.restart_session()
         vim.notify(("ndsh: connected %s (%s)"):format(provider.label, model), vim.log.levels.INFO)
+      end
+      local function free_text()
+        vim.ui.input({ prompt = "Model: ", default = provider.default_model or "" }, function(model)
+          if not model or model == "" then
+            return
+          end
+          finish(model)
+        end)
+      end
+      -- Live catalog when the provider supports it; free text otherwise.
+      require("ndsh.models_catalog").fetch(provider, env, function(models)
+        if not models then
+          return free_text()
+        end
+        local candidates = {}
+        for _, m in ipairs(models) do
+          if m == provider.default_model then
+            table.insert(candidates, 1, { provider = provider.id, model = m })
+          else
+            candidates[#candidates + 1] = { provider = provider.id, model = m }
+          end
+        end
+        candidates[#candidates + 1] = { provider = provider.id, custom = true }
+        require("ndsh.ui.models").open(candidates, function(choice)
+          if choice.custom then
+            free_text()
+            return
+          end
+          finish(choice.model)
+        end)
       end)
     end
     local function ask_key(i)
@@ -713,13 +740,6 @@ function M.select_model()
       add(provider, entry.model)
     end
   end
-  -- One free-text entry per connected provider: any model name, stored
-  -- credentials untouched.
-  for provider, entry in pairs(store) do
-    if provider ~= "_current" and type(entry) == "table" then
-      candidates[#candidates + 1] = { provider = provider, custom = true }
-    end
-  end
   local function apply(provider, model)
     credentials.set_current(provider, model, state.cfg.store_path)
     state.cfg.dsh.provider = provider
@@ -727,21 +747,61 @@ function M.select_model()
     M.restart_session()
     vim.notify(("ndsh: switched to %s / %s (new session)"):format(provider, model), vim.log.levels.INFO)
   end
-  require("ndsh.ui.models").open(candidates, function(choice)
-    if choice.custom then
-      vim.ui.input({ prompt = ("Model (%s): "):format(choice.provider) }, function(model)
-        if not model then
-          return
-        end
-        model = model:gsub("^%s+", ""):gsub("%s+$", "")
-        if model ~= "" then
-          apply(choice.provider, model)
-        end
-      end)
+  local opened = false
+  local function open_picker()
+    if opened then
       return
     end
-    apply(choice.provider, choice.model)
-  end)
+    opened = true
+    -- One free-text entry per connected provider, listed last: any model
+    -- name, stored credentials untouched.
+    for provider, entry in pairs(store) do
+      if provider ~= "_current" and type(entry) == "table" then
+        candidates[#candidates + 1] = { provider = provider, custom = true }
+      end
+    end
+    require("ndsh.ui.models").open(candidates, function(choice)
+      if choice.custom then
+        vim.ui.input({ prompt = ("Model (%s): "):format(choice.provider) }, function(model)
+          if not model then
+            return
+          end
+          model = model:gsub("^%s+", ""):gsub("%s+$", "")
+          if model ~= "" then
+            apply(choice.provider, model)
+          end
+        end)
+        return
+      end
+      apply(choice.provider, choice.model)
+    end)
+  end
+  -- Merge live catalogs from every connected provider that supports
+  -- discovery; the picker opens when all fetches settle (or fail soft).
+  local catalog = require("ndsh.models_catalog")
+  local pending = 0
+  for _, pcfg in ipairs(state.cfg.providers) do
+    local entry = store[pcfg.id]
+    if pcfg.models_url and type(entry) == "table" then
+      pending = pending + 1
+      catalog.fetch(pcfg, entry.env, function(models)
+        if models then
+          for _, m in ipairs(models) do
+            add(pcfg.id, m)
+          end
+        end
+        pending = pending - 1
+        if pending == 0 then
+          open_picker()
+        end
+      end)
+    end
+  end
+  if pending == 0 then
+    open_picker()
+  else
+    vim.notify("ndsh: fetching model catalogs…", vim.log.levels.INFO)
+  end
 end
 
 ---Show the runtime's captured stderr log in a scratch split.

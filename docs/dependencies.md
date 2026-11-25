@@ -26,7 +26,7 @@ nothing touches system paths or requires Node preinstalled.
 
 | Tool | Purpose |
 |---|---|
-| `curl` | downloads the Node.js tarball and SHASUMS256.txt |
+| `curl` | bootstrap downloads; provider model catalog fetches (`:NDSHConnect` / `:NDSHModel`) |
 | `tar` (+ gzip) | extracts the Node.js distribution |
 | `sha256sum` / `shasum` | verifies the tarball against SHASUMS256.txt (fail closed) |
 
