@@ -154,11 +154,24 @@ function M.show(cfg, chat_buf, input_buf)
 end
 
 ---Hide one window, or replace its buffer with an empty scratch when it is
----the tab's last window (which cannot be hidden).
+---the tab's last NORMAL window (which cannot be hidden). Floating windows
+---(e.g. an open telescope picker) always hide, and do not count toward the
+---last-window rule: win_hide rejects the last non-floating window even
+---while floats are up (E444).
 ---@param win integer
 local function hide_or_scratch(win)
+  if vim.api.nvim_win_get_config(win).relative ~= "" then
+    vim.api.nvim_win_hide(win)
+    return
+  end
   local tab = vim.api.nvim_win_get_tabpage(win)
-  if #vim.api.nvim_tabpage_list_wins(tab) == 1 then
+  local normal = 0
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(tab)) do
+    if vim.api.nvim_win_get_config(w).relative == "" then
+      normal = normal + 1
+    end
+  end
+  if normal <= 1 then
     local scratch = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_win_set_buf(win, scratch)
   else

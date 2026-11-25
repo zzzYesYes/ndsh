@@ -391,8 +391,17 @@ ndsh.open()
 check("reopen rebuilds panel buffers", ndsh.is_open() and #vim.api.nvim_tabpage_list_wins(0) == 3)
 ndsh.close()
 
--- 10b. Deleting the last session lands on a fresh provisional one.
+-- 10b. Deleting the last session lands on a fresh provisional one, even
+-- with a floating picker window open: floats must not count toward the
+-- last-window rule (win_hide rejects the last non-floating window).
 ndsh.open()
+local float = vim.api.nvim_open_win(vim.api.nvim_create_buf(false, true), false, {
+  relative = "editor",
+  width = 10,
+  height = 5,
+  row = 1,
+  col = 1,
+})
 vim.ui.select = function(_, _, cb)
   cb("Delete", 1)
 end
@@ -400,7 +409,10 @@ ndsh.delete_session()
 vim.ui.select = function(_, _, cb)
   cb(nil)
 end
-check("deleting the last session opens a fresh one", ndsh.is_open())
+check("deleting the last session with a float open opens a fresh one", ndsh.is_open())
+if vim.api.nvim_win_is_valid(float) then
+  vim.api.nvim_win_close(float, true)
+end
 ndsh.close()
 
 -- 11. restore = "quit" (the default) exits Neovim when the closing panel
