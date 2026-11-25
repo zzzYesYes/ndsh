@@ -307,6 +307,7 @@ local function start_fresh(conv, notice)
   conv.id = ("ndsh-%d-%d"):format(state.seq, math.random(100000))
   state.by_id[conv.id] = conv
   conv.resume_state = "live"
+  conv.wire_touched = nil
   persist.delete_transcript(state.cfg, old_id)
   conv:apply_op({ op = "notice", text = notice })
   persist_save()
@@ -315,14 +316,32 @@ end
 
 ---Resume a detached conversation's wire session. On rejection the session
 ---continues fresh under the same name with a new wire id; on success the
----runtime reattaches with the model-side context intact.
+---runtime reattaches with the model-side context intact. `after` fires once
+---the resume settles either way; concurrent callers queue onto the
+---in-flight attempt.
 ---@param conv table
-local function resume_conversation(conv)
+---@param after fun()|nil
+local function resume_conversation(conv, after)
+  if after then
+    conv._resume_cbs = conv._resume_cbs or {}
+    table.insert(conv._resume_cbs, after)
+  end
+  if conv.resume_state == "resuming" then
+    return -- already in flight; callbacks fire when it settles
+  end
+  local function settle()
+    local cbs = conv._resume_cbs
+    conv._resume_cbs = nil
+    for _, cb in ipairs(cbs or {}) do
+      cb()
+    end
+  end
   M._ensure_runtime()
   if not state.runtime or state.runtime.state == "error" then
     -- No runtime to resume on (bootstrap declined, resolve failed): go
     -- straight to fresh-start instead of hanging in "resuming" forever.
     start_fresh(conv, "no runtime to resume on; starting fresh")
+    settle()
     return
   end
   conv.resume_state = "resuming"
@@ -330,12 +349,14 @@ local function resume_conversation(conv)
     if err then
       start_fresh(conv, "previous session could not be resumed; starting fresh")
       vim.notify(("ndsh: could not resume %q; starting fresh"):format(conv.name), vim.log.levels.WARN)
-      return
+    else
+      conv.resume_state = "live"
+      conv.wire_touched = true
+      conv:apply_op({ op = "notice", text = "session resumed — the agent remembers" })
+      persist_save()
+      conv:refresh_chrome()
     end
-    conv.resume_state = "live"
-    conv:apply_op({ op = "notice", text = "session resumed — the agent remembers" })
-    persist_save()
-    conv:refresh_chrome()
+    settle()
   end)
 end
 
@@ -520,6 +541,17 @@ function M._on_send(conv, text)
     vim.notify("ndsh: runtime not connected; use :NDSHRestart", vim.log.levels.WARN)
     return
   end
+  if conv.resume_state == "detached" or conv.resume_state == "resuming" then
+    -- Re-enter through session/resume first: a direct session/query would
+    -- silently create a fresh wire session under the same id. The prompt
+    -- sends once the resume settles (on the new id if it failed over).
+    resume_conversation(conv, function()
+      conv.wire_touched = true
+      state.runtime:send(conv.id, text)
+    end)
+    return
+  end
+  conv.wire_touched = true
   state.runtime:send(conv.id, text)
 end
 
@@ -579,6 +611,14 @@ function M._ensure_runtime()
         -- is over, and no session.status will arrive to say so.
         for _, conv in ipairs(state.conversations) do
           conv:set_status("idle")
+          -- The wire session died with the process. Mark live sessions
+          -- detached so the next activation re-enters via session/resume;
+          -- otherwise session/query would silently start a FRESH session
+          -- under the same id (getOrCreateSession), losing the context.
+          -- Never-sent sessions have nothing to resume and stay live.
+          if conv.resume_state == "live" and conv.wire_touched then
+            conv.resume_state = "detached"
+          end
         end
       else
         for _, conv in ipairs(state.conversations) do
@@ -745,7 +785,10 @@ function M.select_model()
     state.cfg.dsh.provider = provider
     state.cfg.dsh.model = model
     M.restart_session()
-    vim.notify(("ndsh: switched to %s / %s (new session)"):format(provider, model), vim.log.levels.INFO)
+    vim.notify(
+      ("ndsh: switched to %s / %s — sessions resume on the new route"):format(provider, model),
+      vim.log.levels.INFO
+    )
   end
   local opened = false
   local function open_picker()

@@ -135,8 +135,9 @@ environment at spawn (like `opencode auth login`). Environment variables
 already present when Neovim launches (e.g. `DEEPSEEK_API_KEY`) also work
 without connecting. `:NDSHModel` switches between the configured routes and
 any connected providers; the selection persists across restarts. Because the
-SDK fixes provider/model at `initialize`, switching restarts the runtime and
-begins a new session. Extra routes can be declared via `dsh.models`, e.g.
+SDK fixes provider/model at `initialize`, switching restarts the runtime —
+and live sessions re-enter via `session/resume`, continuing with their full
+context on the new route. Extra routes can be declared via `dsh.models`, e.g.
 `{ provider = "anthropic", model = "claude-opus-4-1", label = "Claude Opus" }`.
 
 ## Test

@@ -61,6 +61,9 @@ ndsh.setup({
   dsh = {
     auto_connect = true,
     cmd = { "python3", vim.fn.getcwd() .. "/tests/fixtures/fake_dsh.py" },
+    -- File-backed wire-session store: the restarted runtime process resumes
+    -- sessions the previous one created, like real dsh's on-disk store.
+    env = { FAKE_DSH_STORE = store_dir .. "/wire_sessions" },
   },
 })
 
@@ -156,6 +159,13 @@ local second = vim.wait(10000, function()
   return chat_text():find("FAKE%-OUTRO: after restart") ~= nil
 end, 100)
 check("prompt after restart renders", second)
+-- The conversation was marked detached when the old runtime died, so the
+-- prompt re-entered via session/resume (context kept) instead of
+-- session/query silently starting a fresh wire session.
+check(
+  "session resumes after runtime restart (notice)",
+  chat_text():find("session resumed", 1, true) ~= nil
+)
 
 -- 4. Multi-session: a new conversation swaps the panel's contents; the
 -- first conversation's transcript persists untouched.

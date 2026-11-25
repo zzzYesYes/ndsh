@@ -5,12 +5,37 @@ Speaks the SDK wire protocol (ndjson JSON-RPC) over stdio. On session/query
 it emits a scripted event sequence for the queried session id. A prompt
 containing "approve" triggers a server-to-client approval/request before the
 tool events, and the tool result echoes the granted outcome.
+
+Like real dsh, wire sessions persist across processes: with FAKE_DSH_STORE
+set, session/query records the session id in that file and session/resume
+accepts any recorded id (plus "persisted-*" fixture ids), so a restarted
+runtime resumes earlier sessions instead of starting fresh.
 """
 import json
+import os
 import sys
 import time
 
 seq = 0
+
+STORE = os.environ.get("FAKE_DSH_STORE")
+
+
+def known_sessions():
+    if not STORE:
+        return set()
+    try:
+        with open(STORE) as f:
+            return set(line.strip() for line in f if line.strip())
+    except OSError:
+        return set()
+
+
+def mark_known(session_id):
+    if not STORE:
+        return
+    with open(STORE, "a") as f:
+        f.write(session_id + "\n")
 
 
 def send(msg):
@@ -121,11 +146,12 @@ def main():
                 "result": {"serverInfo": {"name": "deepseek-harness-sdk-runtime", "version": "0.0.0-fake"}},
             })
         elif method == "session/query":
+            mark_known(msg["params"]["sessionId"])
             time.sleep(0.05)
             run_query(msg)
         elif method == "session/resume":
             sid = msg["params"]["sessionId"]
-            if sid.startswith("persisted-"):
+            if sid.startswith("persisted-") or sid in known_sessions():
                 send({"jsonrpc": "2.0", "id": msg["id"], "result": {}})
             else:
                 send({"jsonrpc": "2.0", "id": msg["id"], "error": {"code": -32602, "message": "unknown session"}})
