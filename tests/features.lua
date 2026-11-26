@@ -26,13 +26,14 @@ vim.ui.input = function(_, on_submit)
   on_submit(table.remove(input_answers, 1))
 end
 
--- Model discovery is stubbed: no real HTTP in tests.
-local catalog = require("ndsh.models_catalog")
+-- Model discovery is stubbed: no real HTTP in tests. cb gets (models, http
+-- status), matching provider_api.fetch.
+local catalog = require("ndsh.provider_api")
 catalog.fetch = function(provider, _, cb)
   if provider.id == "deepseek-official" then
-    cb({ "deepseek-flash", "deepseek-v4-pro" })
+    cb({ "deepseek-flash", "deepseek-v4-pro" }, 200)
   else
-    cb(nil)
+    cb(nil, nil)
   end
 end
 
@@ -43,6 +44,10 @@ local restarted = 0
 local orig_restart = ndsh.restart_session
 ndsh.restart_session = function()
   restarted = restarted + 1
+end
+-- API keys are entered via masked input; stub the wrapper.
+ndsh._ask_secret = function(_, cb)
+  cb(table.remove(input_answers, 1))
 end
 
 ndsh.setup({ store_path = store_path, dsh = { auto_connect = false } })
@@ -156,6 +161,27 @@ ndsh.select_reasoning_effort()
 current = credentials.current(store_path)
 check("reasoning effort persists with the route", current ~= nil and current.reasoning_effort == "high")
 check("effort switch restarts the runtime", restarted == 4)
+
+-- 7. /usage reports the balance via the provider adapter.
+local last_notify
+vim.notify = function(msg)
+  last_notify = msg
+end
+require("ndsh.provider_api").fetch_balance = function(_, _, cb)
+  cb("23.97 CNY (topped-up 23.97)", nil)
+end
+ndsh.usage()
+check("usage reports the balance", last_notify ~= nil and last_notify:find("23.97 CNY", 1, true) ~= nil)
+
+-- 8. A rejected key is re-asked and never stored (connect validates via the
+-- catalog fetch before saving).
+catalog.fetch = function(_, _, cb)
+  cb(nil, 401)
+end
+input_answers = { "sk-bad" }
+ndsh.connect()
+local after = credentials.get("deepseek-official", store_path)
+check("rejected key leaves the store untouched", after ~= nil and after.env.DEEPSEEK_API_KEY == "sk-validation")
 
 ndsh.restart_session = orig_restart
 vim.fn.delete(store_dir, "rf")

@@ -35,3 +35,18 @@ Per docs/upstream-sdk-plan.md, in priority order:
 6. `session/close` + `session/delete` — real deletion, not just detach.
 7. Approval requests carrying tool arguments/diffs — unblocks richer
    approval cards without callId correlation.
+8. Turn cancellation on the SDK wire (`session/cancel { sessionId }` →
+   `agent.cancel`). The agent core already supports it and the ACP profile
+   exposes it as session/cancel; only the SDK server lacks the method.
+   Enables Esc-to-interrupt in the panel (opencode-style). Interim option:
+   version-pinned patch of the managed runtime's sdk-jsonrpc-server.
+   Note: upstream accepts no external PRs — this likely means a fork or
+   waiting.
+9. Runtime adapters beyond deepseek-official (Kimi/Moonshot, Anthropic,
+   OpenAI): the sdk profile registers no other provider today, so ndsh's
+   connect/usage layers only offer DeepSeek. Either an upstream PR or a
+   custom adapter plugin (pi-ai's catalog may shortcut this). ndsh side is
+   ready: provider presets + balance adapter for Kimi already parse.
+10. SDK-wire auth flows: dsh has PKCE browser login (dsh-deepseek-account)
+    and pi-ai registers authorization flows, but the SDK wire exposes no
+    login method — ndsh's browser login detours through `dsh web`.

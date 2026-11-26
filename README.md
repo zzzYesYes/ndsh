@@ -86,9 +86,10 @@ opts = {
 | `:NDSHMessages` | Scan transcript messages and jump to one |
 | `:NDSHRename [name]` | Rename the current session (or `/rename <name>`) |
 | `:NDSHDelete` | Delete the current session (with confirmation) |
-| `:NDSHConnect` | Connect a provider (credentials + live model catalog) |
+| `:NDSHConnect` | Connect a provider (masked key entry, validated; DeepSeek also offers browser login) |
 | `:NDSHModel` | Switch model (persists; sessions resume on the new route) |
 | `:NDSHReasoning` | Switch reasoning effort (off/low/high/max or auto) |
+| `:NDSHUsage` | Show the provider account balance (or `/usage`) |
 | `:NDSHStop` / `:NDSHRestart` | Stop / restart the runtime |
 | `:NDSHInstallRuntime` | Install/repair the managed runtime |
 | `:NDSHLog` | Show the captured runtime stderr log |

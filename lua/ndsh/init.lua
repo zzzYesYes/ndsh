@@ -720,6 +720,77 @@ function M.install_runtime()
   end)
 end
 
+---Masked secret entry for API keys (inputsecret); module-level so tests
+---can stub it.
+---@param prompt string
+---@param cb fun(secret: string)
+function M._ask_secret(prompt, cb)
+  cb(vim.fn.inputsecret(prompt))
+end
+
+---Browser login via the dsh web host: boot the managed runtime in web
+---profile, let the user finish in the browser, then restart the runtime —
+---the account token persists in the dsh profile and the LLM adapter picks
+---it up without any API key.
+---@param provider table cfg.providers entry
+local function browser_login(provider)
+  local Runtime = require("ndsh.runtime")
+  local cmd = Runtime.resolve_cmd(state.cfg)
+  if not cmd then
+    return vim.notify("ndsh: no dsh runtime to boot the login host; :NDSHInstallRuntime first", vim.log.levels.ERROR)
+  end
+  cmd = vim.deepcopy(cmd)
+  for i, a in ipairs(cmd) do
+    if a == "--profile" and cmd[i + 1] then
+      cmd[i + 1] = "web"
+    end
+  end
+  local job = vim.fn.jobstart(cmd, { detach = false })
+  if job <= 0 then
+    return vim.notify("ndsh: failed to start the login host", vim.log.levels.ERROR)
+  end
+  vim.ui.open("http://127.0.0.1:3080")
+  vim.ui.select({ "Done — I logged in", "Cancel" }, {
+    prompt = "ndsh: finish the " .. (provider.label or provider.id) .. " login at http://127.0.0.1:3080",
+  }, function(choice)
+    pcall(vim.fn.jobstop, job)
+    if choice ~= "Done — I logged in" then
+      return
+    end
+    M.restart_session()
+    vim.notify("ndsh: runtime restarting on the account login — the winbar shows whether it connected", vim.log.levels.INFO)
+  end)
+end
+
+---Show the active provider's account balance (/usage, :NDSHUsage) as a
+---transcript notice on the active conversation (a notify when no panel
+---session exists). Failures read as honest one-line reasons.
+function M.usage()
+  ensure_setup()
+  local provider
+  for _, p in ipairs(state.cfg.providers) do
+    if p.id == state.cfg.dsh.provider then
+      provider = p
+      break
+    end
+  end
+  local conv = state.active
+  local function tell(msg)
+    if conv and conv.chat_buf and vim.api.nvim_buf_is_valid(conv.chat_buf) then
+      conv:apply_op({ op = "notice", text = msg })
+    else
+      vim.notify("ndsh: " .. msg, vim.log.levels.INFO)
+    end
+  end
+  if not provider then
+    return tell(("no balance information for provider %q"):format(state.cfg.dsh.provider))
+  end
+  local env = require("ndsh.credentials").env_for(provider.id, state.cfg.store_path)
+  require("ndsh.provider_api").fetch_balance(provider, env, function(text, err)
+    tell(("%s balance: %s"):format(provider.label or provider.id, text or err))
+  end)
+end
+
 ---Interactive provider connection (:NDSHConnect): pick a provider, enter
 ---its credentials and model, persist them, then restart the runtime.
 function M.connect()
@@ -753,9 +824,22 @@ function M.connect()
           finish(model)
         end)
       end
-      -- Live catalog when the provider supports it; free text otherwise.
-      require("ndsh.models_catalog").fetch(provider, env, function(models)
+      -- One catalog fetch validates the key AND feeds the model picker.
+      require("ndsh.provider_api").fetch(provider, env, function(models, status)
+        if status == 401 or status == 403 then
+          vim.notify(
+            ("ndsh: %s rejected the key (HTTP %d) — try again"):format(provider.label, status),
+            vim.log.levels.WARN
+          )
+          env = {}
+          ask_key(1)
+          return
+        end
         if not models then
+          vim.notify(
+            ("ndsh: could not reach %s; keeping the key unvalidated"):format(provider.label),
+            vim.log.levels.WARN
+          )
           return free_text()
         end
         local candidates = {}
@@ -778,19 +862,34 @@ function M.connect()
     end
     local function ask_key(i)
       if i > #provider.env then
+        local env_name = provider.env and provider.env[1]
+        if next(env) == nil and not (env_name and vim.env[env_name]) then
+          return vim.notify(("ndsh: no API key entered; %s not connected"):format(provider.label), vim.log.levels.WARN)
+        end
         ask_model()
         return
       end
       local name = provider.env[i]
-      vim.ui.input({ prompt = ("API key (%s), empty to skip: "):format(name) }, function(secret)
-        if secret == nil then
-          return -- aborted: leave the store and runtime untouched
-        end
+      local hint = provider.console_url and (" — " .. provider.console_url) or ""
+      M._ask_secret(("API key (%s)%s, empty to skip: "):format(name, hint), function(secret)
         if secret ~= "" then
           env[name] = secret
         end
         ask_key(i + 1)
       end)
+    end
+    if provider.account_login then
+      vim.ui.select({ "Paste API key", "Browser login (account)" }, {
+        prompt = ("ndsh: connect %s via"):format(provider.label),
+      }, function(method)
+        if method == "Browser login (account)" then
+          return browser_login(provider)
+        end
+        if method then
+          ask_key(1)
+        end
+      end)
+      return
     end
     ask_key(1)
   end)
@@ -873,7 +972,7 @@ function M.select_model()
   end
   -- Merge live catalogs from every connected provider that supports
   -- discovery; the picker opens when all fetches settle (or fail soft).
-  local catalog = require("ndsh.models_catalog")
+  local catalog = require("ndsh.provider_api")
   local pending = 0
   for _, pcfg in ipairs(state.cfg.providers) do
     local entry = store[pcfg.id]

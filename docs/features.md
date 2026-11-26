@@ -86,6 +86,25 @@ Tool approvals (`dsh.approval`) and structured user questions
 allow once / reject / cancel, with the tool's arguments shown when the
 `tool/call` event arrived first. Dismissing is never an approval.
 
+## Account balance
+
+`/usage` (or `:NDSHUsage`) prints the active provider's account balance as a
+transcript notice. Balance APIs are provider-specific; `provider_api.lua`
+ships adapters for DeepSeek (CNY, topped-up/granted breakdown) and Kimi
+(USD, cash/voucher breakdown — usable once dsh ships a Kimi runtime
+adapter; see TODO.md). Providers without a balance API (or a `balance =
+{ url, parse }` override in config) get an honest notice instead.
+
+## Connecting providers
+
+`:NDSHConnect` lists the configured providers (only deepseek-official until
+dsh ships more runtime adapters — its sdk profile registers no other).
+DeepSeek offers two paths: pasting an API key (masked entry, validated
+against the model catalog before storing, with the console URL in the
+prompt) or browser login, which boots the managed runtime in web profile so
+you can complete the account login in the browser; the token persists in
+the dsh profile and needs no API key afterwards.
+
 ## Runtime
 
 The runtime connects at plugin load and when the panel opens

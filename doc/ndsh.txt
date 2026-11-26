@@ -44,6 +44,7 @@ Local commands — handled by the plugin, never sent to the wire:
 
   /new [name]        Create a session and swap the panel to it
   /rename {name}     Rename the current session (shown on its winbar)
+  /usage             Show the provider account balance (transcript notice)
 
 Runtime commands — routed natively by the dsh SDK profile (verified
 against a live runtime; unknown slash text is sent to the wire unchanged):
@@ -73,6 +74,8 @@ COMMANDS                                                     *ndsh-commands*
   :NDSHDelete        Delete the current session (asks for confirmation)
   :NDSHConnect       Connect a provider (stores credentials)
   :NDSHModel         Select the active model (restarts the runtime)
+  :NDSHReasoning     Select the reasoning effort (restarts the runtime)
+  :NDSHUsage         Show the provider account balance
   :NDSHStop          Stop the runtime
   :NDSHRestart       Restart the runtime
   :NDSHInstallRuntime  Install the managed runtime: a pinned Node.js +

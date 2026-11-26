@@ -25,6 +25,12 @@ local registry = {
       conv:focus_input()
     end,
   },
+  usage = {
+    desc = "Show the provider account balance",
+    run = function()
+      require("ndsh").usage()
+    end,
+  },
 }
 
 ---Registered LOCAL command names, for the highlight pattern.

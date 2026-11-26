@@ -84,12 +84,23 @@ M.defaults = {
   --- Providers offered by :NDSHConnect. `env` lists the variables the
   --- provider authenticates with; `default_model` prefill the model prompt.
   --- `models_url` + `auth` ("bearer" | "anthropic") enable live model
-  --- discovery via the provider's catalog endpoint (all three answer with
-  --- OpenAI's { data = [ { id } ] } shape).
+  --- discovery; `console_url` points at the provider's key page;
+  --- `account_login` offers browser login (the dsh account flow persists
+  --- the token in the dsh profile, no API key needed).
+  --- NOTE: the sdk runtime only ships a DeepSeek adapter for now, so only
+  --- deepseek-official is offered — other providers need a runtime adapter
+  --- first (see TODO.md).
   providers = {
-    { id = "deepseek-official", label = "DeepSeek (official)", env = { "DEEPSEEK_API_KEY" }, default_model = "deepseek-flash", models_url = "https://api.deepseek.com/models", auth = "bearer" },
-    { id = "anthropic", label = "Anthropic", env = { "ANTHROPIC_API_KEY" }, default_model = "claude-sonnet-4-5", models_url = "https://api.anthropic.com/v1/models", auth = "anthropic" },
-    { id = "openai", label = "OpenAI", env = { "OPENAI_API_KEY" }, default_model = "gpt-5", models_url = "https://api.openai.com/v1/models", auth = "bearer" },
+    {
+      id = "deepseek-official",
+      label = "DeepSeek (official)",
+      env = { "DEEPSEEK_API_KEY" },
+      default_model = "deepseek-flash",
+      models_url = "https://api.deepseek.com/models",
+      auth = "bearer",
+      console_url = "https://platform.deepseek.com/api_keys",
+      account_login = true,
+    },
   },
 }
 

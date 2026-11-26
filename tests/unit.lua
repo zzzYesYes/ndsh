@@ -326,6 +326,23 @@ do
   vim.fn.delete(dir, "rf")
 end
 
+-- Provider balance adapters parse provider-specific payloads.
+do
+  local api = require("ndsh.provider_api")
+  local ds = api.balance_adapters["deepseek-official"].parse({
+    balance_infos = { { currency = "CNY", total_balance = "23.97", granted_balance = "0.00", topped_up_balance = "23.97" } },
+  })
+  check("deepseek balance adapter", ds == "23.97 CNY (topped-up 23.97)")
+  local kimi = api.balance_adapters.kimi.parse({
+    data = { available_balance = 49.58894, voucher_balance = 46.58893, cash_balance = 3.00001 },
+  })
+  check("kimi balance adapter", kimi == "$49.59 (cash $3.00, voucher $46.59)")
+  check(
+    "balance adapters reject junk",
+    api.balance_adapters.kimi.parse({}) == nil and api.balance_adapters["deepseek-official"].parse({}) == nil
+  )
+end
+
 if failures > 0 then
   print(("%d check(s) failed"):format(failures))
   vim.cmd("cquit 1")
