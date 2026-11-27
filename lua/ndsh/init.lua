@@ -232,6 +232,8 @@ function M.setup(opts)
       end
     end
   end
+  -- Repair the managed pi-ai route block if it drifted from the store.
+  require("ndsh.routes").sync(state.cfg)
   local function map(key, fn, desc)
     if key then
       vim.keymap.set("n", key, fn, { desc = desc })
@@ -805,7 +807,13 @@ function M.connect()
     if not provider then
       return
     end
+    -- pi-ai route providers: make sure the route exists in the sdk
+    -- profile's patch layer before the runtime (re)starts on it.
+    if provider.route then
+      require("ndsh.routes").ensure_route(state.cfg, provider.route)
+    end
     local env = {}
+    local ask_key ---@type fun(i: integer) forward-declared: the 401 retry loops back
     local function ask_model()
       local function finish(model)
         local credentials = require("ndsh.credentials")
@@ -860,7 +868,7 @@ function M.connect()
         end)
       end)
     end
-    local function ask_key(i)
+    ask_key = function(i)
       if i > #provider.env then
         local env_name = provider.env and provider.env[1]
         if next(env) == nil and not (env_name and vim.env[env_name]) then
@@ -935,6 +943,12 @@ function M.select_model()
     credentials.set_current(provider, model, state.cfg.store_path, state.cfg.dsh.reasoning_effort)
     state.cfg.dsh.provider = provider
     state.cfg.dsh.model = model
+    -- A model picked from discovery may not be declared on the pi-ai route
+    -- yet; add it before the runtime restarts on it.
+    local routes = require("ndsh.routes")
+    if routes.is_route(state.cfg, provider) then
+      routes.ensure_model(state.cfg, provider, model)
+    end
     M.restart_session()
     vim.notify(
       ("ndsh: switched to %s / %s — sessions resume on the new route"):format(provider, model),

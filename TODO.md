@@ -42,11 +42,12 @@ Per docs/upstream-sdk-plan.md, in priority order:
    version-pinned patch of the managed runtime's sdk-jsonrpc-server.
    Note: upstream accepts no external PRs — this likely means a fork or
    waiting.
-9. Runtime adapters beyond deepseek-official (Kimi/Moonshot, Anthropic,
-   OpenAI): the sdk profile registers no other provider today, so ndsh's
-   connect/usage layers only offer DeepSeek. Either an upstream PR or a
-   custom adapter plugin (pi-ai's catalog may shortcut this). ndsh side is
-   ready: provider presets + balance adapter for Kimi already parse.
+9. ~~Runtime adapters beyond deepseek-official~~ — solved differently:
+   the pi-ai adapter ships ~25 provider routes dormant; ndsh manages them
+   programmatically (lua/ndsh/routes.lua writes the sdk profile patch).
+   Remaining polish: richer presets (routes declare models by hand; ndsh
+   presets carry defaults and auto-extend discovered models), more balance
+   adapters per route, `dsh.models` route awareness.
 10. SDK-wire auth flows: dsh has PKCE browser login (dsh-deepseek-account)
     and pi-ai registers authorization flows, but the SDK wire exposes no
     login method — ndsh's browser login detours through `dsh web`.

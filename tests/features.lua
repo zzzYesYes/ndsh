@@ -183,6 +183,35 @@ ndsh.connect()
 local after = credentials.get("deepseek-official", store_path)
 check("rejected key leaves the store untouched", after ~= nil and after.env.DEEPSEEK_API_KEY == "sk-validation")
 
+-- 9. Connecting a pi-ai provider writes its route into the sdk profile's
+-- patch layer (managed block), so the runtime accepts the provider.
+catalog.fetch = function(provider, _, cb)
+  if provider.id == "moonshotai" then
+    cb({ "kimi-k2-0905-preview" }, 200)
+  elseif provider.id == "deepseek-official" then
+    cb({ "deepseek-flash", "deepseek-v4-pro" }, 200)
+  else
+    cb(nil, nil)
+  end
+end
+vim.env.DSH_HOME = store_dir
+local picks = { 2, 1 } -- provider: moonshotai; then first catalog model
+vim.ui.select = function(items, _, on_choice)
+  local i = table.remove(picks, 1)
+  on_choice(items[i], i)
+end
+input_answers = { "sk-kimi" }
+ndsh.connect()
+local route_list = require("ndsh.routes").list(require("ndsh.config").resolve({ store_path = store_path }))
+check("connect stores the pi-ai route", route_list.moonshotai ~= nil)
+local patch = table.concat(vim.fn.readfile(store_dir .. "/profiles/sdk/cordis.patch.yml"), "\n")
+check(
+  "route lands in the profile patch",
+  patch:find("ndsh:managed%-routes") ~= nil and patch:find("moonshotai", 1, true) ~= nil
+)
+check("route provider connects and restarts", restarted == 5)
+vim.env.DSH_HOME = nil
+
 ndsh.restart_session = orig_restart
 vim.fn.delete(store_dir, "rf")
 

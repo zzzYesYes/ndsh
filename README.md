@@ -16,6 +16,9 @@ conversations — no external UI dependencies.
   navigator with transcript-tail preview and `<C-d>` deletion
 - **Sessions survive restarts**: registry + transcripts persist; wire
   sessions resume on the runtime with full context
+- **Multi-provider**: DeepSeek, Kimi (.ai/.cn), Anthropic, OpenAI out of
+  the box — ndsh manages the runtime's pi-ai routes for you; ~25 more are
+  one config entry away
 - **Model & reasoning-effort switching**: live provider model discovery,
   per-session resumes keep context across runtime restarts
 - **Plan-mode and effort indicators** in the winbar, with live context usage

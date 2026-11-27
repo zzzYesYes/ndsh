@@ -86,10 +86,9 @@ M.defaults = {
   --- `models_url` + `auth` ("bearer" | "anthropic") enable live model
   --- discovery; `console_url` points at the provider's key page;
   --- `account_login` offers browser login (the dsh account flow persists
-  --- the token in the dsh profile, no API key needed).
-  --- NOTE: the sdk runtime only ships a DeepSeek adapter for now, so only
-  --- deepseek-official is offered — other providers need a runtime adapter
-  --- first (see TODO.md).
+  --- the token in the dsh profile, no API key needed). `route` marks a
+  --- pi-ai adapter route that ndsh manages in the sdk profile's patch layer
+  --- (lua/ndsh/routes.lua); the provider id is the route id.
   providers = {
     {
       id = "deepseek-official",
@@ -100,6 +99,62 @@ M.defaults = {
       auth = "bearer",
       console_url = "https://platform.deepseek.com/api_keys",
       account_login = true,
+    },
+    {
+      id = "moonshotai",
+      label = "Kimi (Moonshot .ai)",
+      env = { "MOONSHOT_API_KEY" },
+      default_model = "kimi-k2-0905-preview",
+      models_url = "https://api.moonshot.ai/v1/models",
+      auth = "bearer",
+      console_url = "https://platform.kimi.ai/console/api-keys",
+      route = {
+        id = "moonshotai",
+        defaultContextWindow = 262144,
+        defaultMaxTokens = 65536,
+        defaultInput = { "text" },
+        models = { { id = "kimi-k2-0905-preview" } },
+      },
+    },
+    {
+      id = "moonshotai-cn",
+      label = "Kimi (Moonshot .cn)",
+      env = { "MOONSHOT_API_KEY" },
+      default_model = "kimi-k2-0905-preview",
+      models_url = "https://api.moonshot.cn/v1/models",
+      auth = "bearer",
+      console_url = "https://platform.kimi.com",
+      route = {
+        id = "moonshotai-cn",
+        defaultContextWindow = 262144,
+        defaultMaxTokens = 65536,
+        defaultInput = { "text" },
+        models = { { id = "kimi-k2-0905-preview" } },
+      },
+    },
+    {
+      id = "anthropic",
+      label = "Anthropic",
+      env = { "ANTHROPIC_API_KEY" },
+      default_model = "claude-sonnet-4-5",
+      models_url = "https://api.anthropic.com/v1/models",
+      auth = "anthropic",
+      console_url = "https://console.anthropic.com/settings/keys",
+      route = {
+        id = "anthropic",
+        defaultInput = { "text" },
+        models = { { id = "claude-sonnet-4-5", contextWindow = 1000000, maxTokens = 64000 } },
+      },
+    },
+    {
+      id = "openai",
+      label = "OpenAI",
+      env = { "OPENAI_API_KEY" },
+      default_model = "gpt-5",
+      models_url = "https://api.openai.com/v1/models",
+      auth = "bearer",
+      console_url = "https://platform.openai.com/api-keys",
+      route = { id = "openai", defaultInput = { "text" }, models = { { id = "gpt-5" } } },
     },
   },
 }

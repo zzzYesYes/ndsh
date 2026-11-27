@@ -333,14 +333,51 @@ do
     balance_infos = { { currency = "CNY", total_balance = "23.97", granted_balance = "0.00", topped_up_balance = "23.97" } },
   })
   check("deepseek balance adapter", ds == "23.97 CNY (topped-up 23.97)")
-  local kimi = api.balance_adapters.kimi.parse({
+  local kimi = api.balance_adapters.moonshotai.parse({
     data = { available_balance = 49.58894, voucher_balance = 46.58893, cash_balance = 3.00001 },
   })
   check("kimi balance adapter", kimi == "$49.59 (cash $3.00, voucher $46.59)")
   check(
     "balance adapters reject junk",
-    api.balance_adapters.kimi.parse({}) == nil and api.balance_adapters["deepseek-official"].parse({}) == nil
+    api.balance_adapters.moonshotai.parse({}) == nil and api.balance_adapters["deepseek-official"].parse({}) == nil
   )
+end
+
+-- pi-ai route management: routes.json drives the managed patch block.
+do
+  local routes = require("ndsh.routes")
+  local config = require("ndsh.config")
+  local dir = vim.fn.tempname()
+  vim.fn.mkdir(dir, "p")
+  vim.env.DSH_HOME = dir
+  local cfg = config.resolve({ store_path = dir .. "/credentials.json" })
+  local patch_file = dir .. "/profiles/sdk/cordis.patch.yml"
+
+  local kimi_route = {
+    id = "moonshotai",
+    defaultContextWindow = 262144,
+    models = { { id = "kimi-k2-0905-preview" } },
+  }
+  check("ensure_route writes the managed block", routes.ensure_route(cfg, kimi_route) == true)
+  local patch = table.concat(vim.fn.readfile(patch_file), "\n")
+  check(
+    "patch contains the route",
+    patch:find("moonshotai", 1, true) ~= nil and patch:find("ndsh:managed%-routes") ~= nil
+  )
+  check("ensure_route is idempotent", routes.ensure_route(cfg, kimi_route) == false)
+
+  -- Foreign content survives; the managed block is replaced wholesale.
+  local lines = vim.fn.readfile(patch_file)
+  table.insert(lines, 1, "# user header")
+  vim.fn.writefile(lines, patch_file)
+  check("ensure_model appends to a managed route", routes.ensure_model(cfg, "moonshotai", "kimi-k2-thinking") == true)
+  patch = table.concat(vim.fn.readfile(patch_file), "\n")
+  check("user content preserved", patch:find("# user header", 1, true) ~= nil)
+  check("model appended to the route", patch:find("kimi-k2-thinking", 1, true) ~= nil)
+  check("is_route", routes.is_route(cfg, "moonshotai") and not routes.is_route(cfg, "openai"))
+
+  vim.env.DSH_HOME = nil
+  vim.fn.delete(dir, "rf")
 end
 
 if failures > 0 then

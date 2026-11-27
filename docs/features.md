@@ -97,13 +97,24 @@ adapter; see TODO.md). Providers without a balance API (or a `balance =
 
 ## Connecting providers
 
-`:NDSHConnect` lists the configured providers (only deepseek-official until
-dsh ships more runtime adapters — its sdk profile registers no other).
-DeepSeek offers two paths: pasting an API key (masked entry, validated
-against the model catalog before storing, with the console URL in the
-prompt) or browser login, which boots the managed runtime in web profile so
-you can complete the account login in the browser; the token persists in
-the dsh profile and needs no API key afterwards.
+`:NDSHConnect` lists the configured providers. DeepSeek offers two paths:
+pasting an API key (masked entry, validated against the model catalog
+before storing, with the console URL in the prompt) or browser login, which
+boots the managed runtime in web profile so you can complete the account
+login in the browser; the token persists in the dsh profile and needs no
+API key afterwards.
+
+**Multi-provider via pi-ai routes.** The runtime's pi-ai adapter ships ~25
+provider routes (moonshotai, moonshotai-cn, anthropic, openai, google,
+groq, mistral, openrouter, xai…) but mounts dormant until a route is
+configured. ndsh manages that for you (`lua/ndsh/routes.lua`): connecting a
+route provider writes the route into a marked block of
+`~/.dsh/profiles/sdk/cordis.patch.yml` (source of truth: `routes.json`
+beside the credentials store; your own patch content is untouched), and
+picking a discovered model in `:NDSHModel` auto-declares it on the route.
+Presets included: Kimi `.ai` and `.cn` — independent platforms, pick the
+one matching where your key was created — Anthropic, and OpenAI. More
+presets are one table entry away.
 
 ## Runtime
 

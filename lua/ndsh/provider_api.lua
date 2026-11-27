@@ -142,10 +142,18 @@ M.balance_adapters = {
       return #parts > 0 and table.concat(parts, " · ") or nil
     end,
   },
-  -- No runtime adapter ships for Kimi yet (see TODO.md); the balance API
-  -- works the day one lands.
-  kimi = {
+  moonshotai = {
     url = "https://api.moonshot.ai/v1/users/me/balance",
+    parse = function(decoded)
+      local d = type(decoded) == "table" and decoded.data
+      if type(d) ~= "table" or type(d.available_balance) ~= "number" then
+        return nil
+      end
+      return ("$%.2f (cash $%.2f, voucher $%.2f)"):format(d.available_balance, d.cash_balance or 0, d.voucher_balance or 0)
+    end,
+  },
+  ["moonshotai-cn"] = {
+    url = "https://api.moonshot.cn/v1/users/me/balance",
     parse = function(decoded)
       local d = type(decoded) == "table" and decoded.data
       if type(d) ~= "table" or type(d.available_balance) ~= "number" then
