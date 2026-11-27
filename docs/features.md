@@ -86,14 +86,17 @@ Tool approvals (`dsh.approval`) and structured user questions
 allow once / reject / cancel, with the tool's arguments shown when the
 `tool/call` event arrived first. Dismissing is never an approval.
 
-## Account balance
+## Usage
 
-`/usage` (or `:NDSHUsage`) prints the active provider's account balance as a
-transcript notice. Balance APIs are provider-specific; `provider_api.lua`
-ships adapters for DeepSeek (CNY, topped-up/granted breakdown) and Kimi
-(USD, cash/voucher breakdown — usable once dsh ships a Kimi runtime
-adapter; see TODO.md). Providers without a balance API (or a `balance =
-{ url, parse }` override in config) get an honest notice instead.
+`/usage` (or `:NDSHUsage`) prints two transcript notices: a session token
+summary (billed input/output totals plus current context fill, always
+available from the wire) and the provider's account balance. Balance APIs
+are provider-specific; `provider_api.lua` ships adapters for DeepSeek (CNY,
+topped-up/granted breakdown) and Kimi platform keys (USD, cash/voucher).
+The Kimi Code plan exposes no public quota endpoint (the console and the
+official CLI's local backend serve it), so its balance line says so plainly
+— the session summary still works. Providers may override with
+`balance = { url, parse }` in config.
 
 ## Connecting providers
 

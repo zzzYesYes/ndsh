@@ -135,6 +135,13 @@ check(
 )
 check("chat winbar shows reasoning effort", input_winbar:find("auto", 1, true) ~= nil)
 
+-- /usage renders the session token summary accumulated from usage events.
+ndsh.usage()
+check(
+  "usage notice shows session tokens",
+  chat_text():find("session tokens — 12k in · 42 out", 1, true) ~= nil
+)
+
 local back_idle = vim.wait(5000, function()
   return has_status(input_win, "idle")
 end, 50)

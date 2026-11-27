@@ -145,7 +145,7 @@ do
   })
   check(
     "assistant usage projects usage op",
-    with_usage[#with_usage].op == "usage" and with_usage[#with_usage].input == 1000
+    with_usage[#with_usage].op == "usage" and with_usage[#with_usage].input == 1000 and with_usage[#with_usage].output == 10
   )
 
   local route = projection.project({

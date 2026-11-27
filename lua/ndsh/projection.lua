@@ -77,9 +77,10 @@ function M.project(event)
     ops[#ops + 1] = { op = "begin_message", role = "assistant" }
     ops[#ops + 1] = { op = "append", text = text_of(message.content) }
     ops[#ops + 1] = { op = "end_message" }
-    if d.usage and d.usage.inputTokens then
-      -- inputTokens is the request's prompt size, i.e. context fill.
-      ops[#ops + 1] = { op = "usage", input = d.usage.inputTokens }
+    if d.usage then
+      -- inputTokens is the request's prompt size: billed input each call;
+      -- outputTokens is the completion size, additive across the session.
+      ops[#ops + 1] = { op = "usage", input = d.usage.inputTokens, output = d.usage.outputTokens }
     end
     return ops
   elseif t == "request/context" then

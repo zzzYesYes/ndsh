@@ -765,9 +765,25 @@ local function browser_login(provider)
   end)
 end
 
----Show the active provider's account balance (/usage, :NDSHUsage) as a
----transcript notice on the active conversation (a notify when no panel
----session exists). Failures read as honest one-line reasons.
+---Format a token count compactly: 1234 → "1.2k", 1234567 → "1.2M".
+---@param n integer
+---@return string
+local function fmt_tokens(n)
+  if n >= 1000000 then
+    return ("%.1fM"):format(n / 1000000)
+  elseif n >= 10000 then
+    return ("%dk"):format(n / 1000)
+  elseif n >= 1000 then
+    return ("%.1fk"):format(n / 1000)
+  end
+  return tostring(n)
+end
+
+---Show session token usage and the active provider's account balance
+---(/usage, :NDSHUsage) as transcript notices on the active conversation
+---(notifies when no panel session exists). Token totals cover what this
+---client has seen; the balance comes from the provider's API when it has
+---one, an honest reason otherwise.
 function M.usage()
   ensure_setup()
   local provider
@@ -785,6 +801,26 @@ function M.usage()
       vim.notify("ndsh: " .. msg, vim.log.levels.INFO)
     end
   end
+  -- Session token summary: always available from the wire events.
+  if conv then
+    local parts = {}
+    local t = conv.tokens
+    if t.input > 0 or t.output > 0 then
+      parts[#parts + 1] = ("%s in · %s out"):format(fmt_tokens(t.input), fmt_tokens(t.output))
+    end
+    if conv.context.used then
+      local ctx = fmt_tokens(conv.context.used)
+      if conv.context.window then
+        ctx = ctx
+          .. ("/%s · %d%%"):format(fmt_tokens(conv.context.window), math.floor(conv.context.used / conv.context.window * 100 + 0.5))
+      end
+      parts[#parts + 1] = "context " .. ctx
+    end
+    if #parts > 0 then
+      tell(("session tokens — %s"):format(table.concat(parts, " · ")))
+    end
+  end
+  -- Provider balance when the provider exposes one.
   if not provider then
     return tell(("no balance information for provider %q"):format(state.cfg.dsh.provider))
   end

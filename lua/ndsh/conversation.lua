@@ -59,6 +59,9 @@ function M.new(cfg, spec, hooks)
     pending_tools = {}, ---@type table<string, { name: string, summary: string, arguments: string|nil }> open tool calls by callId
     route = nil, ---@type { provider: string, model: string }|nil
     context = { used = nil, window = nil }, ---@type { used: integer|nil, window: integer|nil }
+    ---Billed token totals seen by this client (input re-bills the prompt
+    ---every request; output is additive). Session usage for /usage.
+    tokens = { input = 0, output = 0 }, ---@type { input: integer, output: integer }
     unread = false,
   }, M)
   conv:ensure_buffers()
@@ -363,7 +366,13 @@ function M:apply_op(op)
     self.plan_active = op.active
     self:refresh_chrome()
   elseif op.op == "usage" then
-    self.context.used = op.input
+    if op.input then
+      self.context.used = op.input
+      self.tokens.input = self.tokens.input + op.input
+    end
+    if op.output then
+      self.tokens.output = self.tokens.output + op.output
+    end
     self:refresh_chrome()
   elseif op.op == "route" then
     self.route = { provider = op.provider, model = op.model }
