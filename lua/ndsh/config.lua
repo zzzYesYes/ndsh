@@ -134,6 +134,25 @@ M.defaults = {
       },
     },
     {
+      -- Kimi Code plan keys are a separate product from the Moonshot
+      -- platform keys: they authenticate against api.kimi.com/coding, not
+      -- api.moonshot.cn|ai. No balance endpoint on this host.
+      id = "kimi-coding",
+      label = "Kimi for Coding (kimi.com)",
+      env = { "KIMI_API_KEY" },
+      default_model = "kimi-k2-0905-preview",
+      models_url = "https://api.kimi.com/coding/v1/models",
+      auth = "bearer",
+      console_url = "https://www.kimi.com/coding",
+      route = {
+        id = "kimi-coding",
+        defaultContextWindow = 262144,
+        defaultMaxTokens = 65536,
+        defaultInput = { "text" },
+        models = { { id = "kimi-k2-0905-preview" } },
+      },
+    },
+    {
       id = "anthropic",
       label = "Anthropic",
       env = { "ANTHROPIC_API_KEY" },

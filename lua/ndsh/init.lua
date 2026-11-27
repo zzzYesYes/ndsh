@@ -832,12 +832,8 @@ function M.connect()
       -- One catalog fetch validates the key AND feeds the model picker.
       require("ndsh.provider_api").fetch(provider, env, function(models, status)
         if status == 401 or status == 403 then
-          vim.notify(
-            ("ndsh: %s rejected the key (HTTP %d) — try again"):format(provider.label, status),
-            vim.log.levels.WARN
-          )
           env = {}
-          ask_key(1)
+          ask_key(1, true)
           return
         end
         if not models then
@@ -865,7 +861,9 @@ function M.connect()
         end)
       end)
     end
-    ask_key = function(i)
+    ---@param i integer
+    ---@param rejected boolean|nil the last attempt was refused; say so in the prompt
+    ask_key = function(i, rejected)
       if i > #provider.env then
         local env_name = provider.env and provider.env[1]
         if next(env) == nil and not (env_name and vim.env[env_name]) then
@@ -876,11 +874,16 @@ function M.connect()
       end
       local name = provider.env[i]
       local hint = provider.console_url and (" — " .. provider.console_url) or ""
-      M._ask_secret(("API key (%s)%s, empty to skip: "):format(name, hint), function(secret)
+      local prompt = rejected
+          and ("✗ key rejected by %s — try again, or empty to abort\nAPI key (%s)%s: "):format(provider.label, name, hint)
+        or ("API key (%s)%s, empty to skip: "):format(name, hint)
+      M._ask_secret(prompt, function(secret)
+        -- Clipboard pastes often carry whitespace; a padded key is a 401.
+        secret = (secret or ""):gsub("%s+", "")
         if secret ~= "" then
           env[name] = secret
         end
-        ask_key(i + 1)
+        ask_key(i + 1, rejected)
       end)
     end
     if provider.account_login then
