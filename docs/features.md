@@ -112,9 +112,9 @@ route provider writes the route into a marked block of
 `~/.dsh/profiles/sdk/cordis.patch.yml` (source of truth: `routes.json`
 beside the credentials store; your own patch content is untouched), and
 picking a discovered model in `:NDSHModel` auto-declares it on the route.
-Presets included: Kimi `.ai` and `.cn` — independent platforms, pick the
-one matching where your key was created — Anthropic, and OpenAI. More
-presets are one table entry away.
+Presets included: Kimi `kimi.ai` and Kimi `kimi.com` — independent
+platforms with independent keys, pick the one matching where your key was
+created — Anthropic, and OpenAI. More presets are one table entry away.
 
 ## Runtime
 

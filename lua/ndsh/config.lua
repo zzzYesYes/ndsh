@@ -103,7 +103,7 @@ M.defaults = {
     },
     {
       id = "moonshotai",
-      label = "Kimi (Moonshot .ai)",
+      label = "Kimi (kimi.ai)",
       env = { "MOONSHOT_API_KEY" },
       default_model = "kimi-k2-0905-preview",
       models_url = "https://api.moonshot.ai/v1/models",
@@ -119,7 +119,7 @@ M.defaults = {
     },
     {
       id = "moonshotai-cn",
-      label = "Kimi (Moonshot .cn)",
+      label = "Kimi (kimi.com)",
       env = { "MOONSHOT_API_KEY" },
       default_model = "kimi-k2-0905-preview",
       models_url = "https://api.moonshot.cn/v1/models",
