@@ -26,6 +26,7 @@ M.defaults = {
     resume = nil, ---@type string|nil
     model = nil, ---@type string|nil
     reasoning = nil, ---@type string|nil
+    connect = nil, ---@type string|nil
     new_session = nil, ---@type string|nil
     --- Optional buffer-local tab navigation inside panel windows. Useful
     --- when your global "tab" keys operate on buffers (e.g. barbar): they

@@ -64,6 +64,7 @@ opts = {
     messages = "<leader>anm",    -- scan the transcript
     resume = "<leader>anr",      -- jump back into the last session
     model = "<leader>anM",       -- model selector
+    connect = "<leader>anp",     -- connect a provider
     new_session = "<leader>ann", -- or use /new in the input
   },
 }
