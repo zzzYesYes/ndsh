@@ -797,16 +797,12 @@ end
 ---its credentials and model, persist them, then restart the runtime.
 function M.connect()
   ensure_setup()
-  local providers = state.cfg.providers
-  vim.ui.select(providers, {
-    prompt = "ndsh: connect provider",
-    format_item = function(item)
-      return item.label
-    end,
-  }, function(provider)
+  local credentials = require("ndsh.credentials")
+  require("ndsh.ui.providers").open(state.cfg.providers, function(provider)
     if not provider then
       return
     end
+
     -- pi-ai route providers: make sure the route exists in the sdk
     -- profile's patch layer before the runtime (re)starts on it.
     if provider.route then
@@ -900,6 +896,8 @@ function M.connect()
       return
     end
     ask_key(1)
+  end, function(provider_id)
+    return credentials.get(provider_id, state.cfg.store_path) ~= nil
   end)
 end
 
