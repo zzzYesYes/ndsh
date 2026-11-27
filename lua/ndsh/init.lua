@@ -818,6 +818,11 @@ function M.connect()
         credentials.set_current(provider.id, model, state.cfg.store_path)
         state.cfg.dsh.provider = provider.id
         state.cfg.dsh.model = model
+        -- A catalog model picked at connect time may not be declared on
+        -- the pi-ai route yet; declare it before the runtime boots on it.
+        if provider.route then
+          require("ndsh.routes").ensure_model(state.cfg, provider.route.id, model)
+        end
         M.restart_session()
         vim.notify(("ndsh: connected %s (%s)"):format(provider.label, model), vim.log.levels.INFO)
       end

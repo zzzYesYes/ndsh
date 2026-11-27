@@ -187,7 +187,8 @@ check("rejected key leaves the store untouched", after ~= nil and after.env.DEEP
 -- patch layer (managed block), so the runtime accepts the provider.
 catalog.fetch = function(provider, _, cb)
   if provider.id == "moonshotai" then
-    cb({ "kimi-k2-0905-preview" }, 200)
+    -- The catalog offers a model the preset route does not declare yet.
+    cb({ "kimi-k3", "kimi-k2-0905-preview" }, 200)
   elseif provider.id == "deepseek-official" then
     cb({ "deepseek-flash", "deepseek-v4-pro" }, 200)
   else
@@ -195,7 +196,7 @@ catalog.fetch = function(provider, _, cb)
   end
 end
 vim.env.DSH_HOME = store_dir
-local picks = { 2, 1 } -- provider: moonshotai; then first catalog model
+local picks = { 2, 2 } -- provider: moonshotai; then kimi-k3 (not the seed default)
 vim.ui.select = function(items, _, on_choice)
   local i = table.remove(picks, 1)
   on_choice(items[i], i)
@@ -208,6 +209,16 @@ local patch = table.concat(vim.fn.readfile(store_dir .. "/profiles/sdk/cordis.pa
 check(
   "route lands in the profile patch",
   patch:find("ndsh:managed%-routes") ~= nil and patch:find("moonshotai", 1, true) ~= nil
+)
+check(
+  "catalog model picked at connect is declared on the route",
+  route_list.moonshotai ~= nil
+    and vim.tbl_contains(
+      vim.tbl_map(function(m)
+        return m.id
+      end, route_list.moonshotai.models),
+      "kimi-k3"
+    )
 )
 check("route provider connects and restarts", restarted == 5)
 vim.env.DSH_HOME = nil
